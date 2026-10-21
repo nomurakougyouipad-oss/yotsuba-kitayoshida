@@ -189,9 +189,11 @@ if (FIREBASE_CONFIG && window.firebase) {
     },
     setItem: (id, it) => root.child('items/' + id).set(it),
     bulkSet: obj => root.child('items').update(obj),
-    async removeItem(id) { await root.child('items/' + id).remove(); await root.child('photos/' + id).remove(); },
+    async removeItem(id) { await root.child('items/' + id).remove(); await root.child('photos/' + id).remove(); await root.child('thumbs/' + id).remove(); },
     setPhoto: (id, d) => root.child('photos/' + id).set(d),
     async getPhoto(id) { return (await root.child('photos/' + id).once('value')).val(); },
+    setThumb: (id, d) => root.child('thumbs/' + id).set(d),
+    async getThumb(id) { return (await root.child('thumbs/' + id).once('value')).val(); },
     async mutate(id, fn) {
       const r = await root.child('items/' + id).transaction(cur => cur ? fn(cur) : cur);
       return r.committed && r.snapshot.val();
@@ -221,9 +223,11 @@ if (FIREBASE_CONFIG && window.firebase) {
     },
     async setItem(id, it) { mem.items[id] = it; sync(); },
     async bulkSet(obj) { Object.assign(mem.items, obj); sync(); },
-    async removeItem(id) { delete mem.items[id]; delete mem.photos[id]; sync(); },
+    async removeItem(id) { delete mem.items[id]; delete mem.photos[id]; delete (mem.thumbs || {})[id]; sync(); },
     async setPhoto(id, d) { mem.photos[id] = d; save(); },
     async getPhoto(id) { return mem.photos[id] || null; },
+    async setThumb(id, d) { (mem.thumbs = mem.thumbs || {})[id] = d; save(); },
+    async getThumb(id) { return (mem.thumbs || {})[id] || null; },
     async mutate(id, fn) {
       const cur = mem.items[id]; if (!cur) return null;
       const r = fn(JSON.parse(JSON.stringify(cur)));
@@ -234,11 +238,75 @@ if (FIREBASE_CONFIG && window.firebase) {
   };
 }
 
+// ---------------- 小さい写真をスマホに覚えさせる ----------------
+// 一度読んだ写真はスマホの中（IndexedDB）にとっておき、写真が変わった物だけ読みこむ
+const thumbMem = {};          // id -> { v, data }
+const TC = {
+  dbp: null,
+  open() {
+    if (this.dbp) return this.dbp;
+    this.dbp = new Promise(ok => {
+      try {
+        const rq = indexedDB.open('kyd-thumbs', 1);
+        rq.onupgradeneeded = () => rq.result.createObjectStore('t');
+        rq.onsuccess = () => ok(rq.result);
+        rq.onerror = () => ok(null);
+      } catch (e) { ok(null); }
+    });
+    return this.dbp;
+  },
+  async get(id) {
+    const db = await this.open(); if (!db) return null;
+    return new Promise(ok => {
+      try { const r = db.transaction('t').objectStore('t').get(id); r.onsuccess = () => ok(r.result || null); r.onerror = () => ok(null); }
+      catch (e) { ok(null); }
+    });
+  },
+  async put(id, val) {
+    const db = await this.open(); if (!db) return;
+    try { db.transaction('t', 'readwrite').objectStore('t').put(val, id); } catch (e) { }
+  }
+};
+const hasPhoto = it => !!(it && (it.thumbVer || it.thumb));
+function thumbSrc(id, it) {
+  if (!it) return '';
+  if (it.thumb) return it.thumb;                       // 古い形（物のデータの中に写真）
+  const m = thumbMem[id];
+  return (m && m.v === it.thumbVer) ? m.data : '';
+}
+let thumbBusy = false, thumbAgain = false;
+async function ensureThumbs() {
+  if (thumbBusy) { thumbAgain = true; return; }
+  thumbBusy = true;
+  try {
+    const need = Object.entries(items).filter(([id, it]) => it.thumbVer && !it.thumb && !(thumbMem[id] && thumbMem[id].v === it.thumbVer)).map(([id]) => id);
+    let changed = false;
+    for (let i = 0; i < need.length; i += 6) {
+      await Promise.all(need.slice(i, i + 6).map(async id => {
+        const v = items[id] && items[id].thumbVer; if (!v) return;
+        const c = await TC.get(id);
+        if (c && c.v === v) { thumbMem[id] = c; changed = true; return; }
+        const data = await DB.getThumb(id);       // スマホにない・古いときだけ読みこむ
+        if (data) { const val = { v, data }; thumbMem[id] = val; TC.put(id, val); changed = true; }
+      }));
+    }
+    if (changed) render();
+  } catch (e) { }
+  thumbBusy = false;
+  if (thumbAgain) { thumbAgain = false; ensureThumbs(); }
+}
+async function saveThumb(id, data) {
+  const v = Date.now();
+  await DB.setThumb(id, data);
+  const val = { v, data }; thumbMem[id] = val; TC.put(id, val);
+  return v;
+}
+
 // エクセルのリストを、アプリの形に変える
 function initialItems(makeId) {
   const now = Date.now(), obj = {};
   INITIAL_ITEMS.forEach(x => {
-    obj[makeId()] = { name: x.name, cat: x.cat, unit: x.unit, total: x.total, min: 0, inStock: x.total, out: {}, thumb: '', memo: x.memo || '', order: x.order, nocount: !(x.total > 0), updated: now };
+    obj[makeId()] = { name: x.name, cat: x.cat, unit: x.unit, total: x.total, min: 0, inStock: x.total, out: {}, memo: x.memo || '', order: x.order, nocount: !(x.total > 0), updated: now };
   });
   return obj;
 }
@@ -271,6 +339,7 @@ function render() {
   ab.textContent = admin ? '管理中' : '管理';
   $('#fab').style.display = admin && view === 'list' ? 'block' : 'none';
   if (view === 'list') renderList(); else if (view === 'out') renderOut(); else renderLog();
+  ensureThumbs();
 }
 
 // どの現場にあるかを1行で（多いときは「ほか○か所」）
@@ -311,7 +380,7 @@ function renderList() {
 
   $('#list').innerHTML = list.length ? list.map(i => `
     <button class="card ${isLow(i) ? 'low' : ''}" data-id="${esc(i.id)}">
-      ${i.thumb ? `<img class="thumb" src="${i.thumb}" alt="">` : `<div class="thumb">🔧</div>`}
+      ${thumbSrc(i.id, i) ? `<img class="thumb" src="${thumbSrc(i.id, i)}" alt="">` : `<div class="thumb">${hasPhoto(i) ? '📷' : '🔧'}</div>`}
       <div class="info">
         <div class="name">${esc(i.name)}</div>
         <div class="cat">${esc(i.cat)}</div>
@@ -431,8 +500,8 @@ async function openItem(id) {
   const hist = logs.filter(l => l.itemId === id).slice(0, 5);
   openSheet(`
     <div class="sheet-head"><h2>${esc(it.name)}</h2><button class="close" data-act="close">✕</button></div>
-    ${it.thumb ? `<img class="photo" id="bigPhoto" src="${it.thumb}" alt="">` : ''}
-    <label class="photobtn ${it.thumb ? 'small' : ''}">📷 ${it.thumb ? '写真を取り直す' : '写真をとる・えらぶ'}<input type="file" id="fPhotoQuick" accept="image/*" hidden></label>
+    ${hasPhoto(it) ? `<img class="photo" id="bigPhoto" src="${thumbSrc(id, it)}" alt="">` : ''}
+    <label class="photobtn ${hasPhoto(it) ? 'small' : ''}">📷 ${hasPhoto(it) ? '写真を取り直す' : '写真をとる・えらぶ'}<input type="file" id="fPhotoQuick" accept="image/*" hidden></label>
     ${isLow(it) ? `<div class="warnbox">⚠ 少なくなっています（${it.min}${esc(it.unit)}より少ない）</div>` : ''}
     ${noCount(it) ? `<div class="infobox">数がまだ入っていません。${admin ? '下の「編集」から数を入れてください。' : '管理の人に数を入れてもらってください。'}</div>` : ''}
     ${it.memo ? `<div class="note" style="margin:0 0 10px">📝 ${esc(it.memo)}</div>` : ''}
@@ -457,7 +526,7 @@ async function openItem(id) {
     <h2>最近の記録</h2>
     ${hist.length ? hist.map(logHtml).join('') : '<div class="note">まだ記録はありません</div>'}
   `);
-  if (it.thumb) {
+  if (hasPhoto(it)) {
     const full = await DB.getPhoto(id);
     if (full && openId === id && $('#bigPhoto')) $('#bigPhoto').src = full;
   }
@@ -596,13 +665,13 @@ async function doMove(type) {
 
 // ---------------- 登録・編集（管理モード） ----------------
 function openEdit(id) {
-  const it = id ? items[id] : { name: '', cat: CATEGORIES[0], unit: UNITS[0], total: 0, min: 0, thumb: '' };
+  const it = id ? items[id] : { name: '', cat: CATEGORIES[0], unit: UNITS[0], total: 0, min: 0 };
   if (!it) return;
   editId = id || null; openId = id || null; pendingPhoto = null;
   openSheet(`
     <div class="sheet-head"><h2>${id ? '編集' : '新しく登録'}</h2><button class="close" data-act="${id ? 'back' : 'close'}">✕</button></div>
-    <img class="photo" id="pv" src="${it.thumb || ''}" style="${it.thumb ? '' : 'display:none'}" alt="">
-    <label class="btn sub" style="display:block;text-align:center">📷 写真を${it.thumb ? '取り直す' : 'とる・えらぶ'}<input type="file" id="fPhoto" accept="image/*" hidden></label>
+    <img class="photo" id="pv" src="${id ? thumbSrc(id, it) : ''}" style="${id && hasPhoto(it) ? '' : 'display:none'}" alt="">
+    <label class="btn sub" style="display:block;text-align:center">📷 写真を${id && hasPhoto(it) ? '取り直す' : 'とる・えらぶ'}<input type="file" id="fPhoto" accept="image/*" hidden></label>
     <label class="f">名前</label>
     <input class="in" id="eName" value="${esc(it.name)}" placeholder="例：チェーンブロック 1t">
     <label class="f">分類</label>
@@ -634,9 +703,12 @@ async function saveEdit() {
   const id = editId || DB.newId();
   const who = ls.get('kyd-person') || '管理者';
   try {
-    if (pendingPhoto) await DB.setPhoto(id, pendingPhoto.full);
+    let tv = null;
+    if (pendingPhoto) { await DB.setPhoto(id, pendingPhoto.full); tv = await saveThumb(id, pendingPhoto.thumb); }
     if (isNew) {
-      await DB.setItem(id, { name, cat, unit, total, min, memo, inStock: total, out: {}, thumb: pendingPhoto ? pendingPhoto.thumb : '', updated: Date.now() });
+      const ni = { name, cat, unit, total, min, memo, inStock: total, out: {}, updated: Date.now() };
+      if (tv) ni.thumbVer = tv;
+      await DB.setItem(id, ni);
       await DB.log({ t: 'new', itemId: id, name, unit, qty: total, person: who, at: Date.now() });
       toast('登録しました'); closeSheet();
     } else {
@@ -646,7 +718,7 @@ async function saveEdit() {
         if (total < out) return;
         before = cur.total || 0;
         Object.assign(cur, { name, cat, unit, min, memo, total, inStock: total - out, nocount: false, updated: Date.now() });
-        if (pendingPhoto) cur.thumb = pendingPhoto.thumb;
+        if (tv) { cur.thumbVer = tv; delete cur.thumb; }
         return cur;
       });
       if (!r) return toast('現場に出ている数より少なくはできません');
@@ -682,7 +754,8 @@ async function savePhotoQuick(file) {
   try {
     const full = await resize(file, 800, .7), thumb = await resize(file, 160, .6);
     await DB.setPhoto(id, full);
-    const r = await DB.mutate(id, cur => { cur.thumb = thumb; cur.updated = Date.now(); return cur; });
+    const tv = await saveThumb(id, thumb);
+    const r = await DB.mutate(id, cur => { cur.thumbVer = tv; delete cur.thumb; cur.updated = Date.now(); return cur; });
     if (!r) return toast('保存できませんでした');
     await DB.log({ t: 'photo', itemId: id, name: it.name, person: ls.get('kyd-person') || '', at: Date.now() });
     toast('写真を保存しました');
