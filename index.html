@@ -99,6 +99,17 @@ label.f{display:block;font-size:14px;color:var(--sub);margin:14px 0 6px}
 .photobtn{display:block;text-align:center;background:var(--gl);color:var(--g);border:1.5px dashed var(--g);border-radius:12px;padding:16px;font-size:16px;font-weight:700;margin-bottom:12px;cursor:pointer}
 .photobtn.small{display:inline-block;background:none;border:none;padding:0 0 4px;font-size:14px;margin:-4px 0 10px}
 .photobtn:focus-within{outline:3px solid var(--g);outline-offset:2px}
+.chip.edit{border-style:dashed;color:var(--g);font-weight:700}
+.catlist{display:flex;flex-direction:column;gap:8px}
+.catrow{display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:12px;padding:8px 8px 8px 14px}
+.catrow .cname{flex:1;min-width:0;font-size:16px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.catrow .ccount{flex:none;font-size:13px;color:var(--sub);font-variant-numeric:tabular-nums}
+.mini{flex:none;min-width:44px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font-size:15px;font-weight:700;padding:0 10px}
+.mini.danger{color:var(--red);border-color:var(--redline);background:var(--redl)}
+.mini:disabled{opacity:.3}
+.addrow{display:flex;gap:8px}
+.addrow .in{flex:1;min-width:0}
+.btn.addbtn{flex:none;padding:12px 18px;font-size:16px}
 .nocount{display:inline-block;font-size:14px;font-weight:700;color:var(--sub);border:1.5px dashed var(--line);border-radius:8px;padding:4px 8px;margin-top:2px}
 .infobox{background:var(--bg);color:var(--sub);border:1.5px dashed var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px;line-height:1.6}
 .warnbox{background:var(--redl);color:var(--red);border-radius:10px;padding:10px 12px;font-weight:700;margin-bottom:12px;font-size:15px}
@@ -149,7 +160,9 @@ const FIREBASE_CONFIG = {
   appId: "1:545790130614:web:a7384152ea9a3c5adde917"
 };
 const ADMIN_PIN = '2222';   // 管理モードの暗証番号
-const CATEGORIES = ['吊り具', 'ジャッキ', '電気工具', '溶接', 'ガス', '工具類', '工具箱(赤・黄)', '測定工具', 'その他', '消耗品'];
+// 分類の最初の並び（管理モードの「分類の編集」で、足したり消したりできます）
+const DEFAULT_CATEGORIES = ['吊り具', 'ジャッキ', '電気工具', '溶接', 'ガス', '工具類', '工具箱(赤・黄)', '測定工具', 'その他', '消耗品'];
+let CATEGORIES = DEFAULT_CATEGORIES.slice();
 const UNITS = ['台', '個', '本', '丁', '枚', 'セット', '袋', '箱', 'm'];
 const ROOT = 'kitayoshida';  // Firebaseの中の保存場所の名前
 // ==================================================================
@@ -186,6 +199,11 @@ if (FIREBASE_CONFIG && window.firebase) {
       });
     },
     start() {
+      root.child('settings/categories').on('value', s => {
+        const v = s.val();
+        if (Array.isArray(v) && v.length) CATEGORIES = v.filter(Boolean);
+        render(); if (catSheetOpen) openCats();
+      });
       root.child('items').on('value', s => { items = s.val() || {}; render(); });
       root.child('logs').limitToLast(300).on('value', s => {
         logs = Object.values(s.val() || {}).sort((a, b) => b.at - a.at); render();
@@ -202,7 +220,12 @@ if (FIREBASE_CONFIG && window.firebase) {
       const r = await root.child('items/' + id).transaction(cur => cur ? fn(cur) : cur);
       return r.committed && r.snapshot.val();
     },
-    log: l => root.child('logs').push(l)
+    log: l => root.child('logs').push(l),
+    setCategories: arr => root.child('settings/categories').set(arr),
+    async moveCat(ids, dest) {
+      const up = {}; ids.forEach(id => { up[id + '/cat'] = dest; up[id + '/updated'] = Date.now(); });
+      if (ids.length) await root.child('items').update(up);
+    }
   };
 } else {
   const KEY = 'kitayoshida-demo-v3';
@@ -223,8 +246,11 @@ if (FIREBASE_CONFIG && window.firebase) {
         ? 'Firebaseにつながりません。お試しモードで動いています'
         : 'お試しモード：データはこの端末の中だけに保存されます';
       bar.style.display = 'block';
+      if (mem.settings && Array.isArray(mem.settings.categories) && mem.settings.categories.length) CATEGORIES = mem.settings.categories;
       sync();
     },
+    async setCategories(arr) { (mem.settings = mem.settings || {}).categories = arr; CATEGORIES = arr; sync(); if (catSheetOpen) openCats(); },
+    async moveCat(ids, dest) { ids.forEach(id => { if (mem.items[id]) { mem.items[id].cat = dest; mem.items[id].updated = Date.now(); } }); sync(); },
     async setItem(id, it) { mem.items[id] = it; sync(); },
     async bulkSet(obj) { Object.assign(mem.items, obj); sync(); },
     async removeItem(id) { delete mem.items[id]; delete mem.photos[id]; delete (mem.thumbs || {})[id]; sync(); },
@@ -334,7 +360,7 @@ const USE_CATS = ['消耗品'];   // ここに入っている分類は「使う�
 const isUse = it => USE_CATS.includes(it.cat);
 const outTotal = it => Object.values(it.out || {}).reduce((a, o) => a + (o.qty || 0), 0);
 const fmt = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; };
-const TYPE = { out: ['持ち出し', 'out'], in: ['返却', 'in'], use: ['使用', 'out'], add: ['補充', 'in'], photo: ['写真', ''], new: ['新規登録', ''], edit: ['数を変更', ''] };
+const TYPE = { out: ['持ち出し', 'out'], in: ['返却', 'in'], use: ['使用', 'out'], add: ['補充', 'in'], photo: ['写真', ''], cat: ['分類', ''], new: ['新規登録', ''], edit: ['数を変更', ''] };
 
 // ---------------- 画面を描く ----------------
 function render() {
@@ -371,7 +397,7 @@ function renderList() {
   const label = c => c === 'all' ? 'すべて' : c === 'low' ? '⚠ 少ない物' : c === 'nocount' ? `数が未入力（${nc}）` : esc(c);
   $('#chips').innerHTML = cats.map(c =>
     `<button class="chip ${c === 'low' ? 'warn' : ''} ${filter === c ? 'on' : ''}" data-c="${esc(c)}">${label(c)}</button>`
-  ).join('');
+  ).join('') + (admin ? `<button class="chip edit" data-act="cats">⚙ 分類の編集</button>` : '');
 
   let list = arr.filter(i => filter === 'all' || (filter === 'low' ? isLow(i) : filter === 'nocount' ? noCount(i) : i.cat === filter));
   if (query) {
@@ -492,7 +518,7 @@ function openSheet(html) {
   requestAnimationFrame(() => $('#sheet').classList.add('show'));
 }
 function closeSheet() {
-  openId = null; editId = null;
+  openId = null; editId = null; catSheetOpen = false;
   $('#sheet').classList.remove('show');
   $('#sheetBg').style.display = 'none';
 }
@@ -679,7 +705,7 @@ function openEdit(id) {
     <label class="f">名前</label>
     <input class="in" id="eName" value="${esc(it.name)}" placeholder="例：チェーンブロック 1t">
     <label class="f">分類</label>
-    <select class="in" id="eCat">${CATEGORIES.map(c => `<option ${c === it.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+    <select class="in" id="eCat">${(CATEGORIES.includes(it.cat) || !it.cat ? CATEGORIES : [...CATEGORIES, it.cat]).map(c => `<option ${c === it.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
     <label class="f">数え方</label>
     <select class="in" id="eUnit">${UNITS.map(u => `<option ${u === it.unit ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>
     <label class="f">${isUse(it) ? 'いま倉庫にいくつある？' : '全部でいくつある？（現場に出ている分もふくむ）'}</label>
@@ -751,6 +777,75 @@ async function delItem() {
   catch (e) { toast('消せませんでした'); }
 }
 
+// ---------------- 分類の編集（管理モード） ----------------
+let catSheetOpen = false, delCatName = null;
+const catCount = c => Object.values(items).filter(i => i.cat === c).length;
+function openCats() {
+  catSheetOpen = true; openId = null; editId = null;
+  openSheet(`
+    <div class="sheet-head"><h2>分類の編集</h2><button class="close" data-act="close">✕</button></div>
+    <div class="catlist">${CATEGORIES.map((c, i) => `
+      <div class="catrow">
+        <span class="cname">${esc(c)}</span><span class="ccount">${catCount(c)}件</span>
+        <button class="mini" data-act="catUp" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="上へ">↑</button>
+        <button class="mini danger" data-act="catDel" data-i="${i}">消す</button>
+      </div>`).join('')}</div>
+    <label class="f" for="fNewCat">新しい分類</label>
+    <div class="addrow">
+      <input class="in" id="fNewCat" maxlength="16" placeholder="例：配管工具">
+      <button class="btn addbtn" data-act="catAdd">追加</button>
+    </div>
+    <div class="note">↑で並び順を変えられます。分類「消耗品」の物は「使う・補充する」で記録します。</div>
+  `);
+}
+async function saveCats(arr, memo) {
+  try {
+    await DB.setCategories(arr);
+    if (memo) await DB.log({ t: 'cat', itemId: '', name: memo, person: ls.get('kyd-person') || '管理者', at: Date.now() });
+    return true;
+  } catch (e) { toast('保存できませんでした。電波を確認してください'); return false; }
+}
+async function addCat() {
+  const v = $('#fNewCat').value.trim();
+  if (!v) return toast('分類の名前を入れてください');
+  if (CATEGORIES.includes(v)) return toast('同じ名前の分類があります');
+  if (await saveCats([...CATEGORIES, v], `分類を追加：${v}`)) { toast(`「${v}」を追加しました`); openCats(); }
+}
+async function catUp(i) {
+  if (i <= 0) return;
+  const a = CATEGORIES.slice(); [a[i - 1], a[i]] = [a[i], a[i - 1]];
+  if (await saveCats(a)) openCats();
+}
+function askDelCat(i) {
+  const c = CATEGORIES[i]; if (!c) return;
+  if (CATEGORIES.length <= 1) return toast('分類は1つ以上必要です');
+  delCatName = c; catSheetOpen = false;
+  const n = catCount(c), others = CATEGORIES.filter(x => x !== c);
+  const def = others.includes('その他') ? 'その他' : others[0];
+  openSheet(`
+    <div class="sheet-head"><h2>分類を消しますか？</h2><button class="close" data-act="cats">✕</button></div>
+    <div class="warnbox">「${esc(c)}」を消します</div>
+    ${n ? `<label class="f" for="fMoveTo">この分類の物（${n}件）をどこへ移しますか？</label>
+      <select class="in" id="fMoveTo">${others.map(o => `<option ${o === def ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
+      : '<div class="note">この分類の物はありません。</div>'}
+    <div class="btns" style="margin-top:20px">
+      <button class="btn sub" data-act="cats">やめる</button>
+      <button class="btn danger" data-act="catDelOk">消す</button>
+    </div>
+  `);
+}
+async function doDelCat() {
+  const c = delCatName; if (!c) return;
+  const ids = Object.entries(items).filter(([, i]) => i.cat === c).map(([id]) => id);
+  const dest = ids.length ? $('#fMoveTo').value : null;
+  try {
+    if (ids.length) await DB.moveCat(ids, dest);
+  } catch (e) { return toast('移せませんでした。電波を確認してください'); }
+  if (filter === c) filter = 'all';
+  const memo = `分類を削除：${c}` + (ids.length ? `（${ids.length}件を「${dest}」へ）` : '');
+  if (await saveCats(CATEGORIES.filter(x => x !== c), memo)) { toast(`「${c}」を消しました`); delCatName = null; openCats(); }
+}
+
 // 物の画面から、だれでも写真をのせられる
 async function savePhotoQuick(file) {
   const id = openId, it = items[id]; if (!it) return;
@@ -810,6 +905,11 @@ document.addEventListener('click', e => {
     else if (a === 'delOk') delItem();
     else if (a === 'pinOk') checkPin();
     else if (a === 'importInit') importInitial();
+    else if (a === 'cats') openCats();
+    else if (a === 'catAdd') addCat();
+    else if (a === 'catUp') catUp(+t.dataset.i);
+    else if (a === 'catDel') askDelCat(+t.dataset.i);
+    else if (a === 'catDelOk') doDelCat();
     else if (a === 'moveUse') openUse(openId, 'use');
     else if (a === 'moveAdd') openUse(openId, 'add');
     else if (a === 'doUse') doUse(t.dataset.type);
@@ -859,7 +959,10 @@ function checkPin() {
   if ($('#fPin').value === ADMIN_PIN) { admin = true; closeSheet(); render(); toast('管理モードになりました'); }
   else { toast('番号がちがいます'); $('#fPin').value = ''; }
 }
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'fPin') checkPin(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'fPin') checkPin();
+  if (e.key === 'Enter' && e.target.id === 'fNewCat' && !e.isComposing) addCat();
+});
 
 DB.listen();
 </script>
