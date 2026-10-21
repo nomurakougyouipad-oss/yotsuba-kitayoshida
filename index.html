@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>北吉田倉庫 資材管理</title>
+<meta name="theme-color" content="#143d27">
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 現場向けの業務アプリ：大きな数字と大きなボタン、会社カラーの深緑 */
+:root{--g:#1f5d3a;--gd:#143d27;--gl:#e6f0ea;--ink:#1a1a1a;--sub:#5f6661;--line:#dde2de;--bg:#f3f5f3;--card:#ffffff;--red:#c62828;--redl:#fdecea;--redline:#f3c2bd;--tagbg:#c62828;--amber:#8a5a00;--amberl:#fff6dc;--orange:#b0561a;--outbtn:#b0561a;--onacc:#ffffff;--hdr:#ffffff;--shadow:rgba(0,0,0,.25);--scrim:rgba(0,0,0,.45);--font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--g:#2f7d52;--gd:#0f2a1b;--gl:#1d3327;--ink:#ecefec;--sub:#a3aca6;--line:#2e3631;--bg:#121513;--card:#1b201d;--red:#ef6b63;--redl:#3a1d1b;--redline:#6b2f2b;--tagbg:#b3302a;--amber:#f0c060;--amberl:#3a2f12;--orange:#e89a5e;--outbtn:#a8541c;--shadow:rgba(0,0,0,.6);--scrim:rgba(0,0,0,.6);color-scheme:dark}}
+:root[data-theme="dark"]{--g:#2f7d52;--gd:#0f2a1b;--gl:#1d3327;--ink:#ecefec;--sub:#a3aca6;--line:#2e3631;--bg:#121513;--card:#1b201d;--red:#ef6b63;--redl:#3a1d1b;--redline:#6b2f2b;--tagbg:#b3302a;--amber:#f0c060;--amberl:#3a2f12;--orange:#e89a5e;--outbtn:#a8541c;--shadow:rgba(0,0,0,.6);--scrim:rgba(0,0,0,.6);color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;-webkit-tap-highlight-color:transparent}
+body{padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--gd)}
+button,select,input{font-family:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,label.btn:focus-within{outline:3px solid var(--g);outline-offset:2px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--gd);color:var(--hdr);padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;align-items:center;gap:12px}
+header h1{font-size:18px;font-weight:700;flex:1;line-height:1.3}
+header h1 small{display:block;font-size:12px;font-weight:400;opacity:.75}
+.icon-btn{background:rgba(255,255,255,.14);border:none;color:var(--hdr);border-radius:10px;padding:8px 14px;font-size:14px}
+.icon-btn.on{background:var(--hdr);color:#143d27;font-weight:700}
+#modeBar{display:none;background:var(--amberl);color:var(--amber);font-size:13px;padding:8px 16px;text-align:center;line-height:1.5}
+main{max-width:640px;margin:0 auto;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.view{display:none}.view.show{display:block}
+.alert{display:flex;align-items:center;gap:10px;background:var(--redl);color:var(--red);border:1.5px solid var(--redline);border-radius:12px;padding:12px 14px;font-weight:700;margin-bottom:12px;width:100%;font-size:15px;text-align:left}
+.search{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;background:var(--card);color:var(--ink);margin-bottom:10px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:7px 14px;font-size:14px;color:var(--ink)}
+.chip.on{background:var(--g);border-color:var(--g);color:var(--onacc);font-weight:700}
+.chip.warn{color:var(--red);border-color:var(--redline)}
+.chip.warn.on{background:var(--tagbg);border-color:var(--tagbg);color:var(--onacc)}
+.card{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:14px;padding:10px;margin-bottom:10px;border:1px solid var(--line);width:100%;text-align:left;color:inherit;font:inherit}
+.thumb{width:64px;height:64px;border-radius:10px;background:var(--gl);flex:none;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--g)}
+.card .info{flex:1;min-width:0}
+.card .name{font-weight:700;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .cat{font-size:12px;color:var(--sub);margin-top:3px}
+.card .where{font-size:13px;color:var(--orange);font-weight:700;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qty{text-align:right;flex:none;font-variant-numeric:tabular-nums}
+.qty b{font-size:26px}
+.qty span{font-size:13px;color:var(--sub)}
+.qty .lbl{font-size:11px;color:var(--sub)}
+.tag{display:inline-block;background:var(--tagbg);color:var(--onacc);font-size:12px;font-weight:700;border-radius:6px;padding:2px 7px;margin-top:4px}
+.low{border-color:var(--redline)}
+.low .qty b{color:var(--red)}
+.empty{text-align:center;color:var(--sub);padding:48px 10px;line-height:1.9}
+h2{font-size:15px;color:var(--sub);margin:16px 2px 8px}
+.site{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.site h3{font-size:17px;margin-bottom:6px}
+.site li{list-style:none;display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px dashed var(--line);font-size:15px;cursor:pointer}
+.allback{display:block;width:100%;margin-top:10px}
+.chklist{display:flex;flex-direction:column;gap:8px}
+.chk{display:flex;align-items:center;gap:12px;background:var(--bg);border-radius:12px;padding:12px 14px;font-size:16px;cursor:pointer}
+.chk input{width:24px;height:24px;flex:none;accent-color:var(--g)}
+.chk span{flex:1;min-width:0}
+.chk b{flex:none;font-variant-numeric:tabular-nums}
+.log{display:flex;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:14px;align-items:flex-start;line-height:1.5}
+.log .badge{flex:none;font-size:12px;font-weight:700;border-radius:6px;padding:3px 7px;color:var(--onacc);background:var(--sub)}
+.badge.out{background:var(--outbtn)}.badge.in{background:var(--g)}
+.log .when{color:var(--sub);font-size:12px}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:10}
+nav button{flex:1;border:none;background:none;padding:10px 0 12px;font-size:13px;color:var(--sub);display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button i{font-style:normal;font-size:22px}
+nav button.on{color:var(--g);font-weight:700}
+#fab{display:none;position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(88px + env(safe-area-inset-bottom,0px));background:var(--g);color:var(--onacc);border:none;border-radius:999px;padding:14px 20px;font-size:16px;font-weight:700;box-shadow:0 4px 14px var(--shadow);z-index:11}
+#sheetBg{display:none;position:fixed;inset:0;background:var(--scrim);z-index:20}
+#sheet{position:fixed;left:0;right:0;bottom:0;max-height:92vh;overflow-y:auto;background:var(--card);border-radius:18px 18px 0 0;z-index:21;padding-top:18px;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));transform:translateY(105%);transition:transform .2s;max-width:640px;margin:0 auto}
+#sheet.show{transform:none}
+@media (prefers-reduced-motion: reduce){#sheet,#toast{transition:none}}
+.sheet-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sheet-head h2{flex:1;margin:0;font-size:19px;color:var(--ink);min-width:0}
+.close{flex:none;border:none;background:var(--bg);border-radius:999px;width:38px;height:38px;font-size:18px;color:var(--ink)}
+.photo{width:100%;max-width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:var(--gl);display:block;margin-bottom:12px}
+.big{display:flex;gap:8px;margin-bottom:10px;font-variant-numeric:tabular-nums}
+.big div{flex:1;background:var(--bg);border-radius:12px;padding:10px 4px;text-align:center;font-size:13px}
+.big small{display:block;font-size:12px;color:var(--sub)}
+.big b{font-size:28px}
+.big .main{background:var(--gl)}
+.btns{display:flex;gap:10px;margin:12px 0}
+.btn{flex:1;border:none;border-radius:12px;padding:16px 10px;font-size:18px;font-weight:700;color:var(--onacc);background:var(--g)}
+.btn.out{background:var(--outbtn)}
+.btn.sub{background:var(--bg);color:var(--ink);font-size:15px;padding:13px}
+.btn.danger{background:var(--redl);color:var(--red);font-size:15px;padding:13px}
+.btn:disabled{opacity:.35}
+label.f{display:block;font-size:14px;color:var(--sub);margin:14px 0 6px}
+.in{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;font-size:17px;background:var(--card);color:var(--ink)}
+.step{display:flex;align-items:center;gap:10px}
+.step button{flex:none;width:56px;height:56px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);font-size:26px;color:var(--ink)}
+.step input{text-align:center;font-size:24px;font-weight:700;min-width:0}
+.pin{text-align:center;font-size:28px;letter-spacing:.4em;font-weight:700}
+.note{font-size:13px;color:var(--sub);margin-top:6px;line-height:1.6}
+.photobtn{display:block;text-align:center;background:var(--gl);color:var(--g);border:1.5px dashed var(--g);border-radius:12px;padding:16px;font-size:16px;font-weight:700;margin-bottom:12px;cursor:pointer}
+.photobtn.small{display:inline-block;background:none;border:none;padding:0 0 4px;font-size:14px;margin:-4px 0 10px}
+.photobtn:focus-within{outline:3px solid var(--g);outline-offset:2px}
+.nocount{display:inline-block;font-size:14px;font-weight:700;color:var(--sub);border:1.5px dashed var(--line);border-radius:8px;padding:4px 8px;margin-top:2px}
+.infobox{background:var(--bg);color:var(--sub);border:1.5px dashed var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px;line-height:1.6}
+.warnbox{background:var(--redl);color:var(--red);border-radius:10px;padding:10px 12px;font-weight:700;margin-bottom:12px;font-size:15px}
+#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>北吉田倉庫<small>工具・仮設材の管理</small></h1>
+  <button class="icon-btn" id="adminBtn">管理</button>
+</header>
+<div id="modeBar"></div>
+<main>
+  <section class="view show" id="view-list">
+    <button class="alert" id="lowAlert" style="display:none"></button>
+    <input class="search" id="q" type="search" placeholder="🔍 名前・現場名でさがす">
+    <div class="chips" id="chips"></div>
+    <div id="list"></div>
+  </section>
+  <section class="view" id="view-out"><div id="outList"></div></section>
+  <section class="view" id="view-log"><div id="logList"></div></section>
+</main>
+<button id="fab">＋ 新しく登録</button>
+<nav>
+  <button class="on" data-v="list"><i>📦</i>倉庫の物</button>
+  <button data-v="out"><i>🚚</i>現場に出ている</button>
+  <button data-v="log"><i>📝</i>記録</button>
+</nav>
+<div id="sheetBg"></div>
+<div id="sheet"></div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-database-compat.js"></script>
+<script>
+// ================= 設定（ここだけ書きかえればOK） =================
+// Firebaseの設定を { apiKey: "...", authDomain: "...", databaseURL: "...", ... } の形で貼る。
+// null のままだと「お試しモード」（この端末の中だけに保存）で動きます。
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC4omR7okMSTXKhOICfIT-sdM3n7n_UC24",
+  authDomain: "yotsuba-kitayoshida.firebaseapp.com",
+  databaseURL: "https://yotsuba-kitayoshida-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "yotsuba-kitayoshida",
+  storageBucket: "yotsuba-kitayoshida.firebasestorage.app",
+  messagingSenderId: "545790130614",
+  appId: "1:545790130614:web:a7384152ea9a3c5adde917"
+};
+const ADMIN_PIN = '6433';   // 管理モードの暗証番号
+const CATEGORIES = ['吊り具', 'ジャッキ', '電気工具', '溶接', 'ガス', '工具類', '工具箱(赤・黄)', '測定工具', 'その他', '消耗品'];
+const UNITS = ['台', '個', '本', '丁', '枚', 'セット', '袋', '箱', 'm'];
+const ROOT = 'kitayoshida';  // Firebaseの中の保存場所の名前
+// ==================================================================
+
+// エクセル「道工具リスト」（12/9時点）から取り込んだ最初のデータ
+const INITIAL_ITEMS = /*INITIAL_DATA*/[{"name":"チェンブロ 0.25T","cat":"吊り具","unit":"台","total":2,"order":1},{"name":"チェンブロ 0.5T","cat":"吊り具","unit":"台","total":13,"order":2},{"name":"チェンブロ 1.0T","cat":"吊り具","unit":"台","total":18,"order":3},{"name":"チェンブロ 1.5T","cat":"吊り具","unit":"台","total":6,"order":4},{"name":"チェンブロ 2.0T","cat":"吊り具","unit":"台","total":8,"order":5},{"name":"チェンブロ 3.0T","cat":"吊り具","unit":"台","total":3,"order":6},{"name":"チェンブロ 5.0T","cat":"吊り具","unit":"台","total":3,"order":7},{"name":"レバー","cat":"吊り具","unit":"本","total":12,"order":8},{"name":"シャックル 16T","cat":"吊り具","unit":"個","total":4,"order":9},{"name":"シャックル 16Tおたふく","cat":"吊り具","unit":"個","total":2,"order":10},{"name":"シャックル 10T","cat":"吊り具","unit":"個","total":4,"order":11},{"name":"シャックル 10Tおたふく","cat":"吊り具","unit":"個","total":2,"order":12},{"name":"シャックル 5T","cat":"吊り具","unit":"個","total":4,"order":13},{"name":"シャックル 5Tおたふく","cat":"吊り具","unit":"個","total":8,"order":14},{"name":"シャックル 5T ロング","cat":"吊り具","unit":"個","total":5,"order":15},{"name":"シャックル 3T ロング","cat":"吊り具","unit":"個","total":4,"order":16},{"name":"シャックル 2T","cat":"吊り具","unit":"個","total":16,"order":17},{"name":"シャックル 2Tおたふく","cat":"吊り具","unit":"個","total":4,"order":18},{"name":"シャックル 2Tロング","cat":"吊り具","unit":"個","total":8,"order":19},{"name":"シャックル 1.5T","cat":"吊り具","unit":"個","total":21,"order":20},{"name":"シャックル 1T","cat":"吊り具","unit":"個","total":30,"memo":"エクセル:30↑","order":21},{"name":"シャックル 0.8T","cat":"吊り具","unit":"個","total":4,"order":22},{"name":"シャックル 0.5T","cat":"吊り具","unit":"個","total":9,"order":23},{"name":"4点吊り 16Φ","cat":"吊り具","unit":"個","total":1,"order":24},{"name":"引っ掛け棒","cat":"吊り具","unit":"本","total":4,"order":25},{"name":"介錯ロープ","cat":"吊り具","unit":"本","total":12,"order":26},{"name":"イーグル 0.5T","cat":"吊り具","unit":"台","total":1,"order":27},{"name":"イーグル 1.0T","cat":"吊り具","unit":"台","total":1,"order":28},{"name":"イーグル 2.0T","cat":"吊り具","unit":"台","total":0,"order":29},{"name":"イーグル 3.0T","cat":"吊り具","unit":"台","total":0,"order":30},{"name":"油圧ポンプ(手動)","cat":"ジャッキ","unit":"台","total":2,"order":31},{"name":"ジャーナル 20T","cat":"ジャッキ","unit":"台","total":2,"order":32},{"name":"ジャーナル 15T","cat":"ジャッキ","unit":"台","total":1,"order":33},{"name":"ジャーナル 10T","cat":"ジャッキ","unit":"台","total":2,"order":34},{"name":"爪ジャッキ 5T","cat":"ジャッキ","unit":"台","total":4,"order":35},{"name":"爪ジャッキ 2T","cat":"ジャッキ","unit":"台","total":5,"order":36},{"name":"パンダ","cat":"ジャッキ","unit":"台","total":14,"order":37},{"name":"トランス","cat":"電気工具","unit":"台","total":7,"order":38},{"name":"投光器","cat":"電気工具","unit":"台","total":21,"order":39},{"name":"マンクーラー","cat":"電気工具","unit":"台","total":2,"order":40},{"name":"ロープライト","cat":"電気工具","unit":"本","total":10,"order":41},{"name":"コードリール 200V","cat":"電気工具","unit":"本","total":6,"order":42},{"name":"コードリール 100V","cat":"電気工具","unit":"本","total":2,"order":43},{"name":"延長コード","cat":"電気工具","unit":"本","total":14,"order":44},{"name":"インパクトレンチ19角 バッテリー","cat":"電気工具","unit":"台","total":2,"order":45},{"name":"コマ(インパクト19角用)","cat":"電気工具","unit":"台","total":0,"memo":"エクセル:箱の中","order":46},{"name":"インパクトレンチ12.7角 バッテリー","cat":"電気工具","unit":"台","total":1,"order":47},{"name":"コマ(インパクト12.7角用)","cat":"電気工具","unit":"台","total":0,"memo":"エクセル:箱の中","order":48},{"name":"インパクトドライバー バッテリー","cat":"電気工具","unit":"台","total":0,"order":49},{"name":"ビット 13","cat":"電気工具","unit":"個","total":1,"order":50},{"name":"ビット 17","cat":"電気工具","unit":"個","total":2,"order":51},{"name":"ビット 19","cat":"電気工具","unit":"個","total":3,"order":52},{"name":"ビット 24","cat":"電気工具","unit":"個","total":3,"order":53},{"name":"ビット 22","cat":"電気工具","unit":"個","total":1,"order":54},{"name":"ビット 10","cat":"電気工具","unit":"個","total":1,"order":55},{"name":"グラインダー 100V","cat":"電気工具","unit":"台","total":18,"memo":"エクセル:18(内4個皿無)","order":56},{"name":"グラインダー バッテリー","cat":"電気工具","unit":"台","total":0,"order":57},{"name":"電動ドリル バッテリー","cat":"電気工具","unit":"台","total":0,"order":58},{"name":"セーバーソー 100V","cat":"電気工具","unit":"台","total":0,"order":59},{"name":"セーバーソー バッテリー","cat":"電気工具","unit":"台","total":0,"order":60},{"name":"ホルダー アーク","cat":"溶接","unit":"個","total":1,"order":61},{"name":"アース アーク","cat":"溶接","unit":"個","total":6,"order":62},{"name":"キャプタイヤ","cat":"溶接","unit":"本","total":20,"memo":"エクセル:20本以上","order":63},{"name":"溶接面 手持ち","cat":"溶接","unit":"個","total":9,"order":64},{"name":"溶接面 被り面","cat":"溶接","unit":"個","total":8,"order":65},{"name":"溶接棒 鉄・SUS・309","cat":"溶接","unit":"本","total":0,"memo":"エクセル:いっぱい","order":66},{"name":"アークポータブル","cat":"溶接","unit":"台","total":4,"order":67},{"name":"切断機 大型","cat":"ガス","unit":"台","total":3,"order":68},{"name":"切断機 中型","cat":"ガス","unit":"台","total":8,"order":69},{"name":"酸素ゲージ","cat":"ガス","unit":"個","total":12,"order":70},{"name":"アセゲージ","cat":"ガス","unit":"個","total":12,"order":71},{"name":"ガスホース","cat":"ガス","unit":"本","total":20,"memo":"エクセル:20本以上","order":72},{"name":"ガスライター","cat":"ガス","unit":"本","total":10,"memo":"エクセル:10本程度","order":73},{"name":"オイラー","cat":"ガス","unit":"個","total":8,"order":74},{"name":"ガスメガネ","cat":"ガス","unit":"丁","total":0,"order":75},{"name":"火口","cat":"ガス","unit":"個","total":0,"memo":"エクセル:いっぱい","order":76},{"name":"打撃メガネ 95","cat":"工具類","unit":"丁","total":1,"order":77},{"name":"打撃メガネ 85","cat":"工具類","unit":"丁","total":1,"order":78},{"name":"メガネレンチ 85","cat":"工具類","unit":"丁","total":1,"order":79},{"name":"スパナ 85","cat":"工具類","unit":"丁","total":1,"order":80},{"name":"打撃メガネ 75","cat":"工具類","unit":"丁","total":2,"order":81},{"name":"メガネレンチ 75","cat":"工具類","unit":"丁","total":2,"order":82},{"name":"スパナ 75","cat":"工具類","unit":"丁","total":3,"order":83},{"name":"打撃スパナ 71","cat":"工具類","unit":"丁","total":1,"order":84},{"name":"スパナ 71","cat":"工具類","unit":"丁","total":2,"order":85},{"name":"打撃メガネ 65","cat":"工具類","unit":"丁","total":2,"order":86},{"name":"メガネレンチ 65","cat":"工具類","unit":"丁","total":3,"order":87},{"name":"スパナ 65","cat":"工具類","unit":"丁","total":2,"order":88},{"name":"打撃スパナ 60","cat":"工具類","unit":"丁","total":2,"order":89},{"name":"メガネレンチ 60","cat":"工具類","unit":"丁","total":2,"order":90},{"name":"スパナ 60","cat":"工具類","unit":"丁","total":3,"order":91},{"name":"打撃メガネ 55","cat":"工具類","unit":"丁","total":5,"order":92},{"name":"スパナ 55","cat":"工具類","unit":"丁","total":8,"order":93},{"name":"メガネレンチ 55","cat":"工具類","unit":"丁","total":3,"order":94},{"name":"シノ付き 55","cat":"工具類","unit":"丁","total":4,"order":95},{"name":"打撃メガネ 50","cat":"工具類","unit":"丁","total":1,"order":96},{"name":"メガネレンチ 50","cat":"工具類","unit":"丁","total":1,"order":97},{"name":"スパナ 50","cat":"工具類","unit":"丁","total":1,"order":98},{"name":"打撃メガネ 46","cat":"工具類","unit":"丁","total":2,"order":99},{"name":"メガネレンチ 46","cat":"工具類","unit":"丁","total":1,"order":100},{"name":"スパナ 46","cat":"工具類","unit":"丁","total":5,"order":101},{"name":"シノ付き 46","cat":"工具類","unit":"丁","total":1,"order":102},{"name":"ラチェット 46","cat":"工具類","unit":"丁","total":5,"order":103},{"name":"打撃メガネ 41","cat":"工具類","unit":"丁","total":3,"order":104},{"name":"メガネレンチ 41","cat":"工具類","unit":"丁","total":6,"order":105},{"name":"スパナ 41","cat":"工具類","unit":"丁","total":3,"order":106},{"name":"シノ付き 41","cat":"工具類","unit":"丁","total":2,"order":107},{"name":"打撃メガネ 36","cat":"工具類","unit":"丁","total":3,"order":108},{"name":"メガネレンチ 36","cat":"工具類","unit":"丁","total":4,"order":109},{"name":"スパナ 36","cat":"工具類","unit":"丁","total":9,"order":110},{"name":"ラチェット 36","cat":"工具類","unit":"丁","total":2,"order":111},{"name":"打撃メガネ 35","cat":"工具類","unit":"丁","total":1,"order":112},{"name":"メガネレンチ 35","cat":"工具類","unit":"丁","total":4,"order":113},{"name":"スパナ 35","cat":"工具類","unit":"丁","total":1,"order":114},{"name":"打撃メガネ 32","cat":"工具類","unit":"丁","total":1,"order":115},{"name":"メガネレンチ 32","cat":"工具類","unit":"丁","total":10,"order":116},{"name":"スパナ 32","cat":"工具類","unit":"丁","total":6,"order":117},{"name":"打撃メガネ 30","cat":"工具類","unit":"丁","total":2,"order":118},{"name":"メガネレンチ 30","cat":"工具類","unit":"丁","total":8,"order":119},{"name":"スパナ 30","cat":"工具類","unit":"丁","total":6,"order":120},{"name":"メガネレンチ 24","cat":"工具類","unit":"丁","total":0,"order":121},{"name":"スパナ 24","cat":"工具類","unit":"丁","total":0,"order":122},{"name":"ラチェット 24","cat":"工具類","unit":"丁","total":0,"order":123},{"name":"メガネレンチ 19","cat":"工具類","unit":"丁","total":0,"order":124},{"name":"スパナ 19","cat":"工具類","unit":"丁","total":0,"order":125},{"name":"ラチェット 19","cat":"工具類","unit":"丁","total":0,"order":126},{"name":"メガネレンチ 17","cat":"工具類","unit":"丁","total":0,"order":127},{"name":"スパナ 17","cat":"工具類","unit":"丁","total":0,"order":128},{"name":"ラチェット 17","cat":"工具類","unit":"丁","total":0,"order":129},{"name":"チェーントング 大","cat":"工具類","unit":"本","total":1,"order":130},{"name":"チェーントング 小","cat":"工具類","unit":"本","total":1,"order":131},{"name":"パイレン 600","cat":"工具類","unit":"本","total":4,"order":132},{"name":"パイレン 450","cat":"工具類","unit":"本","total":11,"order":133},{"name":"パイレン 350","cat":"工具類","unit":"本","total":2,"order":134},{"name":"パイレン 300","cat":"工具類","unit":"本","total":5,"order":135},{"name":"パイレン 250","cat":"工具類","unit":"本","total":3,"order":136},{"name":"ボックスレンチセット","cat":"工具類","unit":"丁","total":1,"order":137},{"name":"ペンチ","cat":"工具類","unit":"丁","total":5,"order":138},{"name":"クリッパー","cat":"工具類","unit":"丁","total":5,"order":139},{"name":"モンキー 大","cat":"工具類","unit":"丁","total":1,"order":140},{"name":"モンキー 中","cat":"工具類","unit":"丁","total":4,"order":141},{"name":"モンキー 小","cat":"工具類","unit":"丁","total":5,"order":142},{"name":"ハサミ","cat":"工具類","unit":"丁","total":0,"order":143},{"name":"ワイヤーブラシ","cat":"工具類","unit":"個","total":0,"order":144},{"name":"スクレーパー","cat":"工具類","unit":"個","total":0,"order":145},{"name":"六角レンチ","cat":"工具類","unit":"丁","total":0,"order":146},{"name":"ドライバー +","cat":"工具類","unit":"本","total":0,"order":147},{"name":"ドライバー -","cat":"工具類","unit":"本","total":0,"order":148},{"name":"プラハン","cat":"工具類","unit":"丁","total":6,"order":149},{"name":"石頭ハンマー 小","cat":"工具類","unit":"丁","total":13,"order":150},{"name":"石頭ハンマー 中","cat":"工具類","unit":"丁","total":2,"order":151},{"name":"石頭ハンマー 大","cat":"工具類","unit":"丁","total":2,"order":152},{"name":"ケレンハンマー","cat":"工具類","unit":"丁","total":3,"order":153},{"name":"片手ハンマー","cat":"工具類","unit":"丁","total":20,"order":154},{"name":"バール 大","cat":"工具類","unit":"本","total":3,"order":155},{"name":"バール 中","cat":"工具類","unit":"本","total":6,"order":156},{"name":"バール 小","cat":"工具類","unit":"本","total":4,"order":157},{"name":"マーカーコーン","cat":"その他","unit":"袋","total":2,"memo":"エクセル:2袋","order":158},{"name":"親綱","cat":"その他","unit":"本","total":5,"order":159},{"name":"万力","cat":"その他","unit":"台","total":0,"order":160},{"name":"噴霧器","cat":"その他","unit":"台","total":10,"order":161},{"name":"消化器 大","cat":"その他","unit":"台","total":5,"order":162},{"name":"消化器 小","cat":"その他","unit":"台","total":5,"order":163},{"name":"バケツ","cat":"その他","unit":"個","total":15,"order":164},{"name":"おい棒 真鍮","cat":"その他","unit":"本","total":0,"order":165},{"name":"おい棒 鉄","cat":"その他","unit":"本","total":0,"order":166},{"name":"ヤスリ","cat":"その他","unit":"本","total":0,"order":167},{"name":"組みヤスリ","cat":"その他","unit":"本","total":0,"order":168},{"name":"S字フック","cat":"その他","unit":"個","total":0,"memo":"エクセル:死ぬほどある","order":169},{"name":"板ライナー","cat":"その他","unit":"個","total":0,"memo":"エクセル:いろいろ","order":170},{"name":"角ライナー","cat":"その他","unit":"個","total":0,"order":171},{"name":"ヤワラ","cat":"その他","unit":"個","total":0,"order":172},{"name":"コーン","cat":"その他","unit":"個","total":0,"order":173},{"name":"バー","cat":"その他","unit":"個","total":0,"order":174},{"name":"ダイヤルゲージ","cat":"測定工具","unit":"台","total":0,"order":175},{"name":"インサイドゲージ","cat":"測定工具","unit":"個","total":0,"order":176},{"name":"シリンダーゲージ","cat":"測定工具","unit":"個","total":0,"order":177},{"name":"テーパーゲージ","cat":"測定工具","unit":"個","total":0,"order":178},{"name":"Yレベル 本体と三脚","cat":"測定工具","unit":"台","total":0,"order":179},{"name":"差し金","cat":"測定工具","unit":"本","total":0,"order":180},{"name":"直差し","cat":"測定工具","unit":"本","total":0,"order":181},{"name":"内パス","cat":"測定工具","unit":"個","total":0,"order":182},{"name":"ウエス","cat":"消耗品","unit":"箱","total":6,"memo":"エクセル:6箱ちょい","order":183},{"name":"パーツクリーナー","cat":"消耗品","unit":"本","total":0,"order":184},{"name":"タイペック","cat":"消耗品","unit":"個","total":0,"order":185},{"name":"サンダーのすり刃","cat":"消耗品","unit":"個","total":0,"order":186},{"name":"セーバーソーの刃","cat":"消耗品","unit":"台","total":0,"order":187},{"name":"潤滑スプレー","cat":"消耗品","unit":"本","total":0,"order":188},{"name":"まもるくん","cat":"消耗品","unit":"個","total":0,"order":189},{"name":"ゴミ袋","cat":"消耗品","unit":"個","total":0,"order":190},{"name":"パイオランテープ","cat":"消耗品","unit":"本","total":0,"order":191},{"name":"バール","cat":"工具箱(赤・黄)","unit":"本","total":1,"order":192},{"name":"タガネ","cat":"工具箱(赤・黄)","unit":"本","total":2,"order":193},{"name":"パイレン","cat":"工具箱(赤・黄)","unit":"本","total":2,"order":194},{"name":"モンキー","cat":"工具箱(赤・黄)","unit":"丁","total":1,"order":195},{"name":"ヤトイ","cat":"工具箱(赤・黄)","unit":"個","total":1,"order":196},{"name":"打撃・スパナ・メガネ","cat":"工具箱(赤・黄)","unit":"丁","total":1,"memo":"エクセル:1個ずつ","order":197}];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const keyOf = s => (String(s).trim().replace(/[.#$\[\]\/]/g, '_')) || '_';
+const ls = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+};
+
+let items = {}, logs = [], admin = false, view = 'list', filter = 'all', query = '';
+let openId = null, editId = null, pendingPhoto = null;
+
+// ---------------- データの保存先 ----------------
+let DB;
+if (FIREBASE_CONFIG && window.firebase) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const root = firebase.database().ref(ROOT);
+  DB = {
+    newId: () => root.child('items').push().key,
+    listen() {
+      const bar = $('#modeBar');
+      bar.textContent = 'つないでいます…'; bar.style.display = 'block';
+      firebase.auth().signInAnonymously().then(() => {
+        bar.style.display = 'none';
+        this.start();
+      }).catch(() => {
+        bar.textContent = 'データにつながりません。電波を確認して、ページを開き直してください';
+      });
+    },
+    start() {
+      root.child('items').on('value', s => { items = s.val() || {}; render(); });
+      root.child('logs').limitToLast(300).on('value', s => {
+        logs = Object.values(s.val() || {}).sort((a, b) => b.at - a.at); render();
+      });
+    },
+    setItem: (id, it) => root.child('items/' + id).set(it),
+    bulkSet: obj => root.child('items').update(obj),
+    async removeItem(id) { await root.child('items/' + id).remove(); await root.child('photos/' + id).remove(); },
+    setPhoto: (id, d) => root.child('photos/' + id).set(d),
+    async getPhoto(id) { return (await root.child('photos/' + id).once('value')).val(); },
+    async mutate(id, fn) {
+      const r = await root.child('items/' + id).transaction(cur => cur ? fn(cur) : cur);
+      return r.committed && r.snapshot.val();
+    },
+    log: l => root.child('logs').push(l)
+  };
+} else {
+  const KEY = 'kitayoshida-demo-v3';
+  let mem = null;
+  try { mem = JSON.parse(ls.get(KEY)); } catch (e) { }
+  if (!mem) mem = seed();
+  const save = () => ls.set(KEY, JSON.stringify(mem));
+  const sync = () => {
+    items = JSON.parse(JSON.stringify(mem.items));
+    logs = Object.values(mem.logs).sort((a, b) => b.at - a.at).slice(0, 300);
+    save(); render();
+  };
+  DB = {
+    newId: () => 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    listen() {
+      const bar = $('#modeBar');
+      bar.textContent = FIREBASE_CONFIG
+        ? 'Firebaseにつながりません。お試しモードで動いています'
+        : 'お試しモード：データはこの端末の中だけに保存されます';
+      bar.style.display = 'block';
+      sync();
+    },
+    async setItem(id, it) { mem.items[id] = it; sync(); },
+    async bulkSet(obj) { Object.assign(mem.items, obj); sync(); },
+    async removeItem(id) { delete mem.items[id]; delete mem.photos[id]; sync(); },
+    async setPhoto(id, d) { mem.photos[id] = d; save(); },
+    async getPhoto(id) { return mem.photos[id] || null; },
+    async mutate(id, fn) {
+      const cur = mem.items[id]; if (!cur) return null;
+      const r = fn(JSON.parse(JSON.stringify(cur)));
+      if (r === undefined) return null;
+      mem.items[id] = r; sync(); return r;
+    },
+    async log(l) { mem.logs['l' + Date.now() + Math.random().toString(36).slice(2, 6)] = l; sync(); }
+  };
+}
+
+// エクセルのリストを、アプリの形に変える
+function initialItems(makeId) {
+  const now = Date.now(), obj = {};
+  INITIAL_ITEMS.forEach(x => {
+    obj[makeId()] = { name: x.name, cat: x.cat, unit: x.unit, total: x.total, min: 0, inStock: x.total, out: {}, thumb: '', memo: x.memo || '', order: x.order, nocount: !(x.total > 0), updated: now };
+  });
+  return obj;
+}
+function seed() {
+  let n = 0;
+  return { items: initialItems(() => 'x' + (++n)), logs: {}, photos: {} };
+}
+async function importInitial() {
+  if (Object.keys(items).length) return toast('もう登録されています');
+  try {
+    await DB.bulkSet(initialItems(DB.newId));
+    await DB.log({ t: 'new', itemId: '', name: `エクセルの道具リスト ${INITIAL_ITEMS.length}件`, person: ls.get('kyd-person') || '管理者', at: Date.now() });
+    toast(`${INITIAL_ITEMS.length}件を登録しました`);
+  } catch (e) { toast('登録できませんでした。電波を確認してください'); }
+}
+
+// ---------------- 計算 ----------------
+const isLow = it => (it.min || 0) > 0 && (it.inStock || 0) < it.min;
+const noCount = it => !!it.nocount;
+const USE_CATS = ['消耗品'];   // ここに入っている分類は「使う・補充する」で記録（返さない）
+const isUse = it => USE_CATS.includes(it.cat);
+const outTotal = it => Object.values(it.out || {}).reduce((a, o) => a + (o.qty || 0), 0);
+const fmt = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const TYPE = { out: ['持ち出し', 'out'], in: ['返却', 'in'], use: ['使用', 'out'], add: ['補充', 'in'], photo: ['写真', ''], new: ['新規登録', ''], edit: ['数を変更', ''] };
+
+// ---------------- 画面を描く ----------------
+function render() {
+  const ab = $('#adminBtn');
+  ab.classList.toggle('on', admin);
+  ab.textContent = admin ? '管理中' : '管理';
+  $('#fab').style.display = admin && view === 'list' ? 'block' : 'none';
+  if (view === 'list') renderList(); else if (view === 'out') renderOut(); else renderLog();
+}
+
+// どの現場にあるかを1行で（多いときは「ほか○か所」）
+function siteLine(i) {
+  const outs = Object.values(i.out || {}).filter(o => o.qty > 0).sort((a, b) => b.qty - a.qty);
+  if (!outs.length) return '';
+  const shown = outs.slice(0, 2).map(o => `${esc(o.site)} ${o.qty}${esc(i.unit)}`).join('、');
+  const more = outs.length > 2 ? `　ほか${outs.length - 2}か所` : '';
+  return `<div class="where">📍 ${shown}${more}</div>`;
+}
+
+function renderList() {
+  const arr = Object.entries(items).map(([id, it]) => ({ id, ...it }));
+  const lows = arr.filter(isLow);
+  const a = $('#lowAlert');
+  if (lows.length) {
+    a.style.display = 'flex';
+    a.innerHTML = `⚠ 少なくなっている物が ${lows.length} 件あります<span style="margin-left:auto;font-weight:400;font-size:13px">見る ›</span>`;
+  } else a.style.display = 'none';
+
+  const nc = arr.filter(noCount).length;
+  const cats = ['all', ...(lows.length ? ['low'] : []), ...(admin && nc ? ['nocount'] : []),
+    ...CATEGORIES.filter(c => arr.some(i => i.cat === c)), ...[...new Set(arr.map(i => i.cat))].filter(c => c && !CATEGORIES.includes(c))];
+  if (!cats.includes(filter)) filter = 'all';
+  const label = c => c === 'all' ? 'すべて' : c === 'low' ? '⚠ 少ない物' : c === 'nocount' ? `数が未入力（${nc}）` : esc(c);
+  $('#chips').innerHTML = cats.map(c =>
+    `<button class="chip ${c === 'low' ? 'warn' : ''} ${filter === c ? 'on' : ''}" data-c="${esc(c)}">${label(c)}</button>`
+  ).join('');
+
+  let list = arr.filter(i => filter === 'all' || (filter === 'low' ? isLow(i) : filter === 'nocount' ? noCount(i) : i.cat === filter));
+  if (query) {
+    const q = query.toLowerCase();
+    list = list.filter(i => (i.name || '').toLowerCase().includes(q) ||
+      Object.values(i.out || {}).some(o => o.qty > 0 && String(o.site).toLowerCase().includes(q)));
+  }
+  const ci = c => { const n = CATEGORIES.indexOf(c); return n < 0 ? 99 : n; };
+  list.sort((x, y) => (isLow(y) - isLow(x)) || (ci(x.cat) - ci(y.cat)) || ((x.order ?? 1e9) - (y.order ?? 1e9)) || String(x.name).localeCompare(String(y.name), 'ja'));
+
+  $('#list').innerHTML = list.length ? list.map(i => `
+    <button class="card ${isLow(i) ? 'low' : ''}" data-id="${esc(i.id)}">
+      ${i.thumb ? `<img class="thumb" src="${i.thumb}" alt="">` : `<div class="thumb">🔧</div>`}
+      <div class="info">
+        <div class="name">${esc(i.name)}</div>
+        <div class="cat">${esc(i.cat)}</div>
+        ${siteLine(i)}
+        ${isLow(i) ? '<span class="tag">少ない</span>' : ''}
+      </div>
+      ${noCount(i)
+        ? `<div class="qty"><div class="lbl">数が</div><span class="nocount">未入力</span></div>`
+        : isUse(i)
+        ? `<div class="qty"><div class="lbl">倉庫にある</div><b>${i.inStock || 0}</b><span> ${esc(i.unit)}</span></div>`
+        : `<div class="qty"><div class="lbl">倉庫にある</div><b>${i.inStock || 0}</b><span> / ${i.total || 0}${esc(i.unit)}</span></div>`}
+    </button>`).join('')
+    : arr.length ? '<div class="empty">見つかりませんでした</div>'
+    : `<div class="empty">まだ何も登録されていません。<br>${admin
+        ? `<button class="btn" style="margin-top:14px;width:100%" data-act="importInit">エクセルの道具リスト（${INITIAL_ITEMS.length}件）を入れる</button>`
+        : '右上の「管理」から登録できます。'}</div>`;
+}
+
+function renderOut() {
+  const sites = {};
+  for (const [id, it] of Object.entries(items))
+    for (const o of Object.values(it.out || {}))
+      if (o.qty > 0) (sites[o.site] = sites[o.site] || []).push({ id, name: it.name, qty: o.qty, unit: it.unit });
+  const names = Object.keys(sites).sort((a, b) => a.localeCompare(b, 'ja'));
+  $('#outList').innerHTML = names.length
+    ? names.map(s => `<div class="site"><h3>📍 ${esc(s)}</h3><ul>${sites[s].map(x =>
+      `<li data-id="${esc(x.id)}"><span>${esc(x.name)}</span><b>${x.qty}${esc(x.unit)}</b></li>`).join('')}</ul>
+      <button class="btn sub allback" data-act="returnAll" data-site="${esc(s)}">↩ この現場の物を全部返す</button></div>`).join('')
+    : '<div class="empty">いま現場に出ている物はありません</div>';
+}
+
+// ---------------- 現場の物をまとめて返す ----------------
+let returnSite = null;
+function siteItems(site) {
+  const k = keyOf(site), list = [];
+  for (const [id, it] of Object.entries(items)) {
+    const o = (it.out || {})[k];
+    if (o && o.qty > 0) list.push({ id, name: it.name, unit: it.unit, qty: o.qty });
+  }
+  return list.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
+}
+function openReturnAll(site) {
+  const list = siteItems(site); if (!list.length) return;
+  returnSite = site; openId = null; editId = null;
+  const person = ls.get('kyd-person') || '';
+  openSheet(`
+    <div class="sheet-head"><h2>まとめて返す</h2><button class="close" data-act="close">✕</button></div>
+    <div class="note" style="margin:0 0 10px">📍 <b>${esc(site)}</b> から倉庫に戻す物です。<br>まだ現場に残す物は、チェックを外してください。</div>
+    <div class="chklist">${list.map(x => `
+      <label class="chk"><input type="checkbox" class="rAll" value="${esc(x.id)}" checked>
+        <span>${esc(x.name)}</span><b>${x.qty}${esc(x.unit)}</b></label>`).join('')}</div>
+    <label class="f" for="fPerson">あなたの名前</label>
+    <input class="in" id="fPerson" value="${esc(person)}" placeholder="例：山田">
+    <div class="btns" style="margin-top:22px"><button class="btn" data-act="doReturnAll">まとめて返す</button></div>
+  `);
+}
+async function doReturnAll() {
+  const site = returnSite, k = keyOf(site);
+  const ids = [...document.querySelectorAll('.rAll:checked')].map(c => c.value);
+  const person = $('#fPerson').value.trim();
+  if (!ids.length) return toast('返す物にチェックを入れてください');
+  if (!person) return toast('名前を入れてください');
+  ls.set('kyd-person', person);
+  let done = 0;
+  try {
+    for (const id of ids) {
+      const it = items[id]; if (!it) continue;
+      let q = 0;
+      const r = await DB.mutate(id, cur => {
+        const o = (cur.out || {})[k];
+        if (!o || o.qty <= 0) return;
+        q = o.qty;
+        delete cur.out[k];
+        cur.inStock = (cur.inStock || 0) + q;
+        cur.updated = Date.now();
+        return cur;
+      });
+      if (r && q > 0) {
+        await DB.log({ t: 'in', itemId: id, name: it.name, unit: it.unit, qty: q, site, person, at: Date.now() });
+        done++;
+      }
+    }
+    toast(done ? `${done}件を倉庫に返しました` : '返す物がありませんでした');
+    closeSheet();
+  } catch (e) { toast(`${done}件まで返しました。電波を確認して、残りをもう一度返してください`); }
+}
+
+function logHtml(l) {
+  const [lab, cls] = TYPE[l.t] || ['記録', ''];
+  const where = l.site ? ((l.t === 'out' || l.t === 'use') ? ` → ${esc(l.site)}` : ` ← ${esc(l.site)}`) : '';
+  return `<div class="log"><span class="badge ${cls}">${lab}</span><div>
+    <div><b>${esc(l.name)}</b> ${l.qty != null ? `${l.qty}${esc(l.unit || '')}` : ''}${where}</div>
+    <div class="when">${fmt(l.at)}${l.person ? `・${esc(l.person)}` : ''}${l.memo ? `・${esc(l.memo)}` : ''}</div>
+  </div></div>`;
+}
+function renderLog() {
+  $('#logList').innerHTML = logs.length ? logs.map(logHtml).join('') : '<div class="empty">まだ記録はありません</div>';
+}
+
+// ---------------- 下から出る画面 ----------------
+function openSheet(html) {
+  $('#sheet').innerHTML = html;
+  $('#sheet').scrollTop = 0;
+  $('#sheetBg').style.display = 'block';
+  requestAnimationFrame(() => $('#sheet').classList.add('show'));
+}
+function closeSheet() {
+  openId = null; editId = null;
+  $('#sheet').classList.remove('show');
+  $('#sheetBg').style.display = 'none';
+}
+
+async function openItem(id) {
+  const it = items[id]; if (!it) return closeSheet();
+  openId = id;
+  const outs = Object.values(it.out || {}).filter(o => o.qty > 0);
+  const hist = logs.filter(l => l.itemId === id).slice(0, 5);
+  openSheet(`
+    <div class="sheet-head"><h2>${esc(it.name)}</h2><button class="close" data-act="close">✕</button></div>
+    ${it.thumb ? `<img class="photo" id="bigPhoto" src="${it.thumb}" alt="">` : ''}
+    <label class="photobtn ${it.thumb ? 'small' : ''}">📷 ${it.thumb ? '写真を取り直す' : '写真をとる・えらぶ'}<input type="file" id="fPhotoQuick" accept="image/*" hidden></label>
+    ${isLow(it) ? `<div class="warnbox">⚠ 少なくなっています（${it.min}${esc(it.unit)}より少ない）</div>` : ''}
+    ${noCount(it) ? `<div class="infobox">数がまだ入っていません。${admin ? '下の「編集」から数を入れてください。' : '管理の人に数を入れてもらってください。'}</div>` : ''}
+    ${it.memo ? `<div class="note" style="margin:0 0 10px">📝 ${esc(it.memo)}</div>` : ''}
+    ${isUse(it) ? `
+    <div class="big"><div class="main"><small>倉庫にある</small><b>${it.inStock || 0}</b>${esc(it.unit)}</div></div>
+    <div class="note">消耗品なので「返す」はありません。使った数と、買い足した数を記録します。</div>
+    <div class="btns">
+      <button class="btn out" data-act="moveUse" ${(it.inStock || 0) > 0 ? '' : 'disabled'}>使う</button>
+      <button class="btn" data-act="moveAdd" ${noCount(it) ? 'disabled' : ''}>補充する</button>
+    </div>` : `
+    <div class="big">
+      <div class="main"><small>倉庫にある</small><b>${it.inStock || 0}</b>${esc(it.unit)}</div>
+      <div><small>現場に出ている</small><b>${outTotal(it)}</b>${esc(it.unit)}</div>
+      <div><small>全部で</small><b>${it.total || 0}</b>${esc(it.unit)}</div>
+    </div>
+    ${outs.length ? `<div class="note">📍 ${outs.map(o => `${esc(o.site)} ${o.qty}${esc(it.unit)}`).join('　')}</div>` : ''}
+    <div class="btns">
+      <button class="btn out" data-act="moveOut" ${(it.inStock || 0) > 0 ? '' : 'disabled'}>持ち出す</button>
+      <button class="btn" data-act="moveIn" ${outs.length ? '' : 'disabled'}>返す</button>
+    </div>`}
+    ${admin ? `<div class="btns"><button class="btn sub" data-act="edit">✏️ 編集・数の変更</button></div>` : ''}
+    <h2>最近の記録</h2>
+    ${hist.length ? hist.map(logHtml).join('') : '<div class="note">まだ記録はありません</div>'}
+  `);
+  if (it.thumb) {
+    const full = await DB.getPhoto(id);
+    if (full && openId === id && $('#bigPhoto')) $('#bigPhoto').src = full;
+  }
+}
+
+// 消耗品：使う・補充する
+function openUse(id, type) {
+  const it = items[id]; if (!it) return;
+  const isUseT = type === 'use';
+  const pastSites = [...new Set(logs.filter(l => l.site).map(l => l.site))].slice(0, 30);
+  const person = ls.get('kyd-person') || '';
+  openSheet(`
+    <div class="sheet-head"><h2>${isUseT ? '使う' : '補充する'}：${esc(it.name)}</h2><button class="close" data-act="back">✕</button></div>
+    ${isUseT ? `<label class="f" for="fSite">どこで使う？（なくてもOK）</label>
+      <input class="in" id="fSite" list="siteList" placeholder="例：〇〇工場 配管工事">
+      <datalist id="siteList">${pastSites.map(s => `<option value="${esc(s)}">`).join('')}</datalist>` : ''}
+    <label class="f">いくつ？${isUseT ? `（倉庫に <span id="maxN">${it.inStock || 0}</span>${esc(it.unit)}）` : ''}</label>
+    <div class="step">
+      <button data-act="minus">−</button>
+      <input class="in" id="fQty" type="number" inputmode="numeric" value="1" min="1">
+      <button data-act="plus">＋</button>
+    </div>
+    <label class="f" for="fPerson">あなたの名前</label>
+    <input class="in" id="fPerson" value="${esc(person)}" placeholder="例：山田">
+    <div class="btns" style="margin-top:22px">
+      <button class="btn ${isUseT ? 'out' : ''}" data-act="doUse" data-type="${type}">${isUseT ? '使う' : '補充する'}</button>
+    </div>
+  `);
+  moveType = type;
+}
+async function doUse(type) {
+  const id = openId, it = items[id]; if (!it) return;
+  const site = $('#fSite') ? $('#fSite').value.trim() : '';
+  const qty = parseInt($('#fQty').value, 10);
+  const person = $('#fPerson').value.trim();
+  if (!(qty > 0)) return toast('数を入れてください');
+  if (!person) return toast('名前を入れてください');
+  ls.set('kyd-person', person);
+  try {
+    const r = await DB.mutate(id, cur => {
+      if (type === 'use') {
+        if ((cur.inStock || 0) < qty) return;
+        cur.inStock -= qty; cur.total = Math.max(0, (cur.total || 0) - qty);
+      } else {
+        cur.inStock = (cur.inStock || 0) + qty; cur.total = (cur.total || 0) + qty;
+      }
+      cur.updated = Date.now();
+      return cur;
+    });
+    if (!r) return toast('数が足りません。もう一度確認してください');
+    const l = { t: type, itemId: id, name: it.name, unit: it.unit, qty, person, at: Date.now() };
+    if (site) l.site = site;
+    await DB.log(l);
+    toast(type === 'use' ? '使った数を記録しました' : '補充を記録しました');
+    closeSheet();
+  } catch (e) { toast('保存できませんでした。電波を確認してください'); }
+}
+
+let moveType = null;
+function openMove(id, type) {
+  const it = items[id]; if (!it) return;
+  moveType = type;
+  const outs = Object.values(it.out || {}).filter(o => o.qty > 0);
+  const isOut = type === 'out';
+  if (!isOut && !outs.length) return;
+  const pastSites = [...new Set(logs.filter(l => l.site).map(l => l.site))].slice(0, 30);
+  const person = ls.get('kyd-person') || '';
+  const max0 = isOut ? (it.inStock || 0) : outs[0].qty;
+  openSheet(`
+    <div class="sheet-head"><h2>${isOut ? '持ち出す' : '返す'}：${esc(it.name)}</h2><button class="close" data-act="back">✕</button></div>
+    ${isOut
+      ? `<label class="f">どこの現場へ？</label>
+         <input class="in" id="fSite" list="siteList" placeholder="例：〇〇工場 配管工事">
+         <datalist id="siteList">${pastSites.map(s => `<option value="${esc(s)}">`).join('')}</datalist>`
+      : `<label class="f">どこの現場から？</label>
+         <select class="in" id="fSite">${outs.map(o => `<option value="${esc(o.site)}" data-max="${o.qty}">${esc(o.site)}（${o.qty}${esc(it.unit)}）</option>`).join('')}</select>`}
+    <label class="f">いくつ？（${isOut ? '倉庫に' : 'その現場に'} <span id="maxN">${max0}</span>${esc(it.unit)}）</label>
+    <div class="step">
+      <button data-act="minus">−</button>
+      <input class="in" id="fQty" type="number" inputmode="numeric" value="1" min="1">
+      <button data-act="plus">＋</button>
+    </div>
+    <label class="f">あなたの名前</label>
+    <input class="in" id="fPerson" value="${esc(person)}" placeholder="例：山田">
+    <div class="btns" style="margin-top:22px">
+      <button class="btn ${isOut ? 'out' : ''}" data-act="doMove" data-type="${type}">${isOut ? '持ち出す' : '返す'}</button>
+    </div>
+  `);
+}
+function curMax() {
+  const it = items[openId]; if (!it) return 1;
+  if (moveType === 'add') return 9999;
+  const s = $('#fSite');
+  if (s && s.tagName === 'SELECT') return Math.max(1, +s.selectedOptions[0].dataset.max || 1);
+  return Math.max(1, it.inStock || 0);
+}
+function updateMax() {
+  $('#maxN').textContent = curMax();
+  const i = $('#fQty'); if (+i.value > curMax()) i.value = curMax();
+}
+
+async function doMove(type) {
+  const id = openId, it = items[id]; if (!it) return;
+  const site = $('#fSite').value.trim();
+  const qty = parseInt($('#fQty').value, 10);
+  const person = $('#fPerson').value.trim();
+  if (!site) return toast('現場名を入れてください');
+  if (!(qty > 0)) return toast('数を入れてください');
+  if (!person) return toast('名前を入れてください');
+  ls.set('kyd-person', person);
+  const k = keyOf(site);
+  try {
+    const r = await DB.mutate(id, cur => {
+      cur.out = cur.out || {};
+      if (type === 'out') {
+        if ((cur.inStock || 0) < qty) return;
+        cur.inStock = (cur.inStock || 0) - qty;
+        const o = cur.out[k] || { site, qty: 0 };
+        o.qty += qty; cur.out[k] = o;
+      } else {
+        const o = cur.out[k];
+        if (!o || o.qty < qty) return;
+        o.qty -= qty;
+        if (o.qty === 0) delete cur.out[k];
+        cur.inStock = (cur.inStock || 0) + qty;
+      }
+      cur.updated = Date.now();
+      return cur;
+    });
+    if (!r) return toast('数が足りません。もう一度確認してください');
+    await DB.log({ t: type, itemId: id, name: it.name, unit: it.unit, qty, site, person, at: Date.now() });
+    toast(type === 'out' ? '持ち出しを記録しました' : '返却を記録しました');
+    closeSheet();
+  } catch (e) { toast('保存できませんでした。電波を確認してください'); }
+}
+
+// ---------------- 登録・編集（管理モード） ----------------
+function openEdit(id) {
+  const it = id ? items[id] : { name: '', cat: CATEGORIES[0], unit: UNITS[0], total: 0, min: 0, thumb: '' };
+  if (!it) return;
+  editId = id || null; openId = id || null; pendingPhoto = null;
+  openSheet(`
+    <div class="sheet-head"><h2>${id ? '編集' : '新しく登録'}</h2><button class="close" data-act="${id ? 'back' : 'close'}">✕</button></div>
+    <img class="photo" id="pv" src="${it.thumb || ''}" style="${it.thumb ? '' : 'display:none'}" alt="">
+    <label class="btn sub" style="display:block;text-align:center">📷 写真を${it.thumb ? '取り直す' : 'とる・えらぶ'}<input type="file" id="fPhoto" accept="image/*" hidden></label>
+    <label class="f">名前</label>
+    <input class="in" id="eName" value="${esc(it.name)}" placeholder="例：チェーンブロック 1t">
+    <label class="f">分類</label>
+    <select class="in" id="eCat">${CATEGORIES.map(c => `<option ${c === it.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+    <label class="f">数え方</label>
+    <select class="in" id="eUnit">${UNITS.map(u => `<option ${u === it.unit ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>
+    <label class="f">${isUse(it) ? 'いま倉庫にいくつある？' : '全部でいくつある？（現場に出ている分もふくむ）'}</label>
+    <input class="in" id="eTotal" type="number" inputmode="numeric" value="${it.total || 0}" min="0">
+    ${id && outTotal(it) ? `<div class="note">いま現場に ${outTotal(it)}${esc(it.unit)} 出ています。これより少なくはできません。</div>` : ''}
+    <label class="f">いくつより少なくなったら知らせる？</label>
+    <input class="in" id="eMin" type="number" inputmode="numeric" value="${it.min || 0}" min="0">
+    <div class="note">倉庫にある数がこの数より少なくなると、赤くお知らせします。0なら知らせません。</div>
+    <label class="f" for="eMemo">メモ（なくてもOK）</label>
+    <input class="in" id="eMemo" value="${esc(it.memo || '')}" placeholder="例：4個は皿なし">
+    ${it.memo && it.memo.startsWith('エクセル:') ? '<div class="note">「エクセル:」はエクセルに書いてあった数の書き方です。数を確かめたら消してOKです。</div>' : ''}
+    <div class="btns" style="margin-top:22px"><button class="btn" data-act="saveEdit">保存する</button></div>
+    ${id ? `<div class="btns"><button class="btn danger" data-act="delete">この物を消す</button></div>` : ''}
+  `);
+}
+
+async function saveEdit() {
+  const name = $('#eName').value.trim();
+  const cat = $('#eCat').value, unit = $('#eUnit').value;
+  const total = Math.max(0, parseInt($('#eTotal').value, 10) || 0);
+  const min = Math.max(0, parseInt($('#eMin').value, 10) || 0);
+  const memo = $('#eMemo').value.trim();
+  if (!name) return toast('名前を入れてください');
+  const isNew = !editId;
+  const id = editId || DB.newId();
+  const who = ls.get('kyd-person') || '管理者';
+  try {
+    if (pendingPhoto) await DB.setPhoto(id, pendingPhoto.full);
+    if (isNew) {
+      await DB.setItem(id, { name, cat, unit, total, min, memo, inStock: total, out: {}, thumb: pendingPhoto ? pendingPhoto.thumb : '', updated: Date.now() });
+      await DB.log({ t: 'new', itemId: id, name, unit, qty: total, person: who, at: Date.now() });
+      toast('登録しました'); closeSheet();
+    } else {
+      let before = null;
+      const r = await DB.mutate(id, cur => {
+        const out = outTotal(cur);
+        if (total < out) return;
+        before = cur.total || 0;
+        Object.assign(cur, { name, cat, unit, min, memo, total, inStock: total - out, nocount: false, updated: Date.now() });
+        if (pendingPhoto) cur.thumb = pendingPhoto.thumb;
+        return cur;
+      });
+      if (!r) return toast('現場に出ている数より少なくはできません');
+      if (before !== total) await DB.log({ t: 'edit', itemId: id, name, unit, memo: `全部の数 ${before}→${total}`, person: who, at: Date.now() });
+      toast('保存しました');
+      setTimeout(() => openItem(id), 50);
+    }
+  } catch (e) { toast('保存できませんでした。電波を確認してください'); }
+}
+
+function askDelete() {
+  const it = items[editId]; if (!it) return;
+  openSheet(`
+    <div class="sheet-head"><h2>消しますか？</h2><button class="close" data-act="back">✕</button></div>
+    <div class="warnbox">「${esc(it.name)}」を一覧から消します</div>
+    <div class="note">これまでの記録は残ります。</div>
+    <div class="btns" style="margin-top:20px">
+      <button class="btn sub" data-act="back">やめる</button>
+      <button class="btn danger" data-act="delOk">消す</button>
+    </div>
+  `);
+}
+async function delItem() {
+  const id = editId || openId; if (!items[id]) return;
+  try { await DB.removeItem(id); toast('消しました'); closeSheet(); }
+  catch (e) { toast('消せませんでした'); }
+}
+
+// 物の画面から、だれでも写真をのせられる
+async function savePhotoQuick(file) {
+  const id = openId, it = items[id]; if (!it) return;
+  toast('写真を保存しています…');
+  try {
+    const full = await resize(file, 800, .7), thumb = await resize(file, 160, .6);
+    await DB.setPhoto(id, full);
+    const r = await DB.mutate(id, cur => { cur.thumb = thumb; cur.updated = Date.now(); return cur; });
+    if (!r) return toast('保存できませんでした');
+    await DB.log({ t: 'photo', itemId: id, name: it.name, person: ls.get('kyd-person') || '', at: Date.now() });
+    toast('写真を保存しました');
+    setTimeout(() => { if (openId === id) openItem(id); }, 50);
+  } catch (e) { toast('写真を保存できませんでした。電波を確認してください'); }
+}
+
+function resize(file, max, q) {
+  return new Promise((ok, ng) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      ok(c.toDataURL('image/jpeg', q));
+    };
+    img.onerror = ng; img.src = url;
+  });
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---------------- 操作 ----------------
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act],[data-v],[data-c],[data-id]');
+  if (!t) return;
+  const a = t.dataset.act;
+  if (a) {
+    if (a === 'close') closeSheet();
+    else if (a === 'back') openId ? openItem(openId) : closeSheet();
+    else if (a === 'moveOut') openMove(openId, 'out');
+    else if (a === 'moveIn') openMove(openId, 'in');
+    else if (a === 'edit') openEdit(openId);
+    else if (a === 'minus' || a === 'plus') {
+      const i = $('#fQty');
+      const v = (parseInt(i.value, 10) || 0) + (a === 'plus' ? 1 : -1);
+      i.value = Math.min(Math.max(1, v), curMax());
+    }
+    else if (a === 'doMove') doMove(t.dataset.type);
+    else if (a === 'saveEdit') saveEdit();
+    else if (a === 'delete') askDelete();
+    else if (a === 'delOk') delItem();
+    else if (a === 'pinOk') checkPin();
+    else if (a === 'importInit') importInitial();
+    else if (a === 'moveUse') openUse(openId, 'use');
+    else if (a === 'moveAdd') openUse(openId, 'add');
+    else if (a === 'doUse') doUse(t.dataset.type);
+    else if (a === 'returnAll') openReturnAll(t.dataset.site);
+    else if (a === 'doReturnAll') doReturnAll();
+    return;
+  }
+  if (t.dataset.v) {
+    view = t.dataset.v;
+    document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b === t));
+    document.querySelectorAll('.view').forEach(s => s.classList.toggle('show', s.id === 'view-' + view));
+    window.scrollTo(0, 0); render(); return;
+  }
+  if (t.dataset.c) { filter = t.dataset.c; renderList(); return; }
+  if (t.dataset.id) openItem(t.dataset.id);
+});
+
+document.addEventListener('change', async e => {
+  if (e.target.id === 'fPhoto' && e.target.files[0]) {
+    const f = e.target.files[0];
+    try {
+      const full = await resize(f, 800, .7), thumb = await resize(f, 160, .6);
+      pendingPhoto = { full, thumb };
+      const pv = $('#pv'); pv.src = full; pv.style.display = 'block';
+    } catch (err) { toast('写真を読み込めませんでした'); }
+  }
+  if (e.target.id === 'fPhotoQuick' && e.target.files[0]) savePhotoQuick(e.target.files[0]);
+  if (e.target.id === 'fSite' && e.target.tagName === 'SELECT') updateMax();
+});
+
+$('#q').addEventListener('input', e => { query = e.target.value.trim(); renderList(); });
+$('#lowAlert').onclick = () => { filter = 'low'; renderList(); };
+$('#sheetBg').onclick = closeSheet;
+$('#fab').onclick = () => openEdit(null);
+$('#adminBtn').onclick = () => {
+  if (admin) { admin = false; render(); toast('管理モードを終わりました'); if (openId) openItem(openId); return; }
+  openId = null; editId = null;
+  openSheet(`
+    <div class="sheet-head"><h2>管理モード</h2><button class="close" data-act="close">✕</button></div>
+    <label class="f" for="fPin">暗証番号を入れてください</label>
+    <input class="in pin" id="fPin" type="password" inputmode="numeric" autocomplete="off">
+    <div class="btns" style="margin-top:20px"><button class="btn" data-act="pinOk">入る</button></div>
+  `);
+  setTimeout(() => { const i = $('#fPin'); if (i) i.focus(); }, 250);
+};
+function checkPin() {
+  if ($('#fPin').value === ADMIN_PIN) { admin = true; closeSheet(); render(); toast('管理モードになりました'); }
+  else { toast('番号がちがいます'); $('#fPin').value = ''; }
+}
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'fPin') checkPin(); });
+
+DB.listen();
+</script>
+</body>
+</html>
