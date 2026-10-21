@@ -1,0 +1,12 @@
+{
+  "name": "北吉田倉庫 資材管理",
+  "short_name": "北吉田倉庫",
+  "start_url": "./",
+  "display": "browser",
+  "background_color": "#ffffff",
+  "theme_color": "#143d27",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
