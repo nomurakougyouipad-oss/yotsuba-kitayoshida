@@ -102,6 +102,12 @@ label.f{display:block;font-size:14px;color:var(--sub);margin:14px 0 6px}
 .chip.edit{border-style:dashed;color:var(--g);font-weight:700}
 .seltools{display:flex;align-items:center;gap:8px;margin:2px 0 10px}
 .seltools .selhint{flex:1;min-width:0;font-size:13px;color:var(--sub)}
+.card .mv{flex:none;display:flex;flex-direction:column;gap:6px}
+.mvbtn{width:44px;height:36px;border-radius:10px;border:1.5px solid var(--g);background:var(--card);color:var(--g);font-size:18px;font-weight:700}
+.mvbtn:disabled{opacity:.25;border-color:var(--line);color:var(--sub)}
+.card.sorting{cursor:default}
+.card.sorting .thumb{display:none}
+.card.sorting .name{white-space:normal;overflow:visible}
 .mini.wide{padding:0 16px;color:var(--g);border-color:var(--g)}
 .card.selectable{cursor:pointer}
 .card .tick{flex:none;width:28px;height:28px;border-radius:999px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:var(--onacc);background:var(--card)}
@@ -176,7 +182,6 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "545790130614",
   appId: "1:545790130614:web:a7384152ea9a3c5adde917"
 };
-const ADMIN_PIN = '2222';   // 管理モードの暗証番号
 // 分類の最初の並び（管理モードの「分類の編集」で、足したり消したりできます）
 const DEFAULT_CATEGORIES = ['吊り具', 'ジャッキ', '電気工具', '溶接', 'ガス', '工具類', '工具箱(赤・黄)', '測定工具', 'その他', '消耗品'];
 let CATEGORIES = DEFAULT_CATEGORIES.slice();
@@ -239,6 +244,10 @@ if (FIREBASE_CONFIG && window.firebase) {
     },
     log: l => root.child('logs').push(l),
     setCategories: arr => root.child('settings/categories').set(arr),
+    async setOrders(map) {
+      const up = {}; Object.entries(map).forEach(([id, o]) => { up[id + '/order'] = o; });
+      if (Object.keys(up).length) await root.child('items').update(up);
+    },
     async moveCat(ids, dest) {
       const up = {}; ids.forEach(id => { up[id + '/cat'] = dest; up[id + '/updated'] = Date.now(); });
       if (ids.length) await root.child('items').update(up);
@@ -267,6 +276,7 @@ if (FIREBASE_CONFIG && window.firebase) {
       sync();
     },
     async setCategories(arr) { (mem.settings = mem.settings || {}).categories = arr; CATEGORIES = arr; sync(); if (catSheetOpen) openCats(); },
+    async setOrders(map) { Object.entries(map).forEach(([id, o]) => { if (mem.items[id]) mem.items[id].order = o; }); sync(); },
     async moveCat(ids, dest) { ids.forEach(id => { if (mem.items[id]) { mem.items[id].cat = dest; mem.items[id].updated = Date.now(); } }); sync(); },
     async setItem(id, it) { mem.items[id] = it; sync(); },
     async bulkSet(obj) { Object.assign(mem.items, obj); sync(); },
@@ -384,9 +394,9 @@ function render() {
   const ab = $('#adminBtn');
   ab.classList.toggle('on', admin);
   ab.textContent = admin ? '管理中' : '管理';
-  if (!admin || view !== 'list') { selMode = false; sel.clear(); }
+  if (!admin || view !== 'list') { selMode = false; sortMode = false; sel.clear(); }
   for (const id of [...sel]) if (!items[id]) sel.delete(id);
-  $('#fab').style.display = admin && view === 'list' && !selMode ? 'block' : 'none';
+  $('#fab').style.display = admin && view === 'list' && !selMode && !sortMode ? 'block' : 'none';
   if (view === 'list') renderList(); else if (view === 'out') renderOut(); else renderLog();
   renderSelBar();
   ensureThumbs();
@@ -426,16 +436,23 @@ function renderList() {
       Object.values(i.out || {}).some(o => o.qty > 0 && String(o.site).toLowerCase().includes(q)));
   }
   const ci = c => { const n = CATEGORIES.indexOf(c); return n < 0 ? 99 : n; };
-  list.sort((x, y) => (isLow(y) - isLow(x)) || (ci(x.cat) - ci(y.cat)) || ((x.order ?? 1e9) - (y.order ?? 1e9)) || String(x.name).localeCompare(String(y.name), 'ja'));
+  list.sort(byOrder);
 
   visibleIds = list.map(i => i.id);
   const tools = !admin || !arr.length ? ''
-    : !selMode ? `<div class="seltools"><button class="mini wide" data-act="selStart">☑ まとめて選ぶ</button></div>`
+    : sortMode ? `<div class="seltools"><span class="selhint">↑↓ で順番を入れかえ（同じ分類の中で動きます）</span>
+        <button class="mini wide" data-act="sortEnd">おわる</button></div>`
+    : !selMode ? `<div class="seltools"><button class="mini wide" data-act="selStart">☑ まとめて選ぶ</button><button class="mini wide" data-act="sortStart">↕ 並べ替え</button></div>`
     : `<div class="seltools"><span class="selhint">消したい物・移したい物をタップ</span>
         <button class="mini" data-act="selAll">表示中を全部</button><button class="mini" data-act="selEnd">やめる</button></div>`;
+  const pos = sortMode ? catPositions() : null;
+  const tag = sortMode ? 'div' : 'button';
   $('#list').innerHTML = tools + (list.length ? list.map(i => `
-    <button class="card ${isLow(i) ? 'low' : ''} ${selMode ? 'selectable' : ''} ${sel.has(i.id) ? 'sel' : ''}" data-id="${esc(i.id)}">
+    <${tag} class="card ${isLow(i) ? 'low' : ''} ${selMode ? 'selectable' : ''} ${sel.has(i.id) ? 'sel' : ''} ${sortMode ? 'sorting' : ''}" data-id="${esc(i.id)}">
       ${selMode ? `<span class="tick" aria-hidden="true">${sel.has(i.id) ? '✓' : ''}</span>` : ''}
+      ${sortMode ? `<span class="mv">
+        <button class="mvbtn" data-act="mvUp" data-id="${esc(i.id)}" ${pos[i.id].first ? 'disabled' : ''} aria-label="上へ">↑</button>
+        <button class="mvbtn" data-act="mvDn" data-id="${esc(i.id)}" ${pos[i.id].last ? 'disabled' : ''} aria-label="下へ">↓</button></span>` : ''}
       ${thumbSrc(i.id, i) ? `<img class="thumb" src="${thumbSrc(i.id, i)}" alt="">` : `<div class="thumb">${hasPhoto(i) ? '📷' : '🔧'}</div>`}
       <div class="info">
         <div class="name">${esc(i.name)}</div>
@@ -448,13 +465,43 @@ function renderList() {
         : isUse(i)
         ? `<div class="qty"><div class="lbl">倉庫にある</div><b>${i.inStock || 0}</b><span> ${esc(i.unit)}</span></div>`
         : `<div class="qty"><div class="lbl">倉庫にある</div><b>${i.inStock || 0}</b><span> / ${i.total || 0}${esc(i.unit)}</span></div>`}
-    </button>`).join('') : '')
+    </${tag}>`).join('') : '')
     + (list.length ? ''
     : arr.length ? '<div class="empty">見つかりませんでした</div>'
     : `<div class="empty">まだ何も登録されていません。<br>${admin
         ? `<button class="btn" style="margin-top:14px;width:100%" data-act="importInit">エクセルの道具リスト（${INITIAL_ITEMS.length}件）を入れる</button>`
         : '右上の「管理」から登録できます。'}</div>`);
 }
+
+// ---------------- 並べ替え（管理モード） ----------------
+// 分類の順 → その中で自分で決めた順（order）→ 名前
+const catIdx = c => { const n = CATEGORIES.indexOf(c); return n < 0 ? 99 : n; };
+const byOrder = (x, y) => (catIdx(x.cat) - catIdx(y.cat)) || ((x.order ?? 1e9) - (y.order ?? 1e9)) || String(x.name).localeCompare(String(y.name), 'ja');
+let sortMode = false;
+function catList(cat) {
+  return Object.entries(items).filter(([, i]) => i.cat === cat).map(([id, i]) => ({ id, ...i })).sort(byOrder);
+}
+function catPositions() {
+  const pos = {}, groups = {};
+  Object.entries(items).forEach(([id, i]) => (groups[i.cat] = groups[i.cat] || []).push({ id, ...i }));
+  Object.values(groups).forEach(g => { g.sort(byOrder); g.forEach((x, k) => pos[x.id] = { first: k === 0, last: k === g.length - 1 }); });
+  return pos;
+}
+let moving = false;
+async function moveItem(id, dir) {
+  const it = items[id]; if (!it || moving) return;
+  const arr = catList(it.cat);
+  const k = arr.findIndex(x => x.id === id), j = k + dir;
+  if (k < 0 || j < 0 || j >= arr.length) return;
+  [arr[k], arr[j]] = [arr[j], arr[k]];
+  const up = {};
+  arr.forEach((x, n) => { const o = (n + 1) * 10; if (x.order !== o) up[x.id] = o; });
+  moving = true;
+  try { await DB.setOrders(up); }
+  catch (e) { toast('保存できませんでした。電波を確認してください'); }
+  moving = false;
+}
+const nextOrder = cat => Math.max(0, ...Object.values(items).filter(i => i.cat === cat).map(i => i.order || 0)) + 10;
 
 // ---------------- まとめて選ぶ（管理モード） ----------------
 let selMode = false, visibleIds = [];
@@ -628,7 +675,7 @@ async function openItem(id) {
     ${hasPhoto(it) ? `<img class="photo" id="bigPhoto" src="${thumbSrc(id, it)}" alt="">` : ''}
     <label class="photobtn ${hasPhoto(it) ? 'small' : ''}">📷 ${hasPhoto(it) ? '写真を取り直す' : '写真をとる・えらぶ'}<input type="file" id="fPhotoQuick" accept="image/*" hidden></label>
     ${isLow(it) ? `<div class="warnbox">⚠ 少なくなっています（${it.min}${esc(it.unit)}より少ない）</div>` : ''}
-    ${noCount(it) ? `<div class="infobox">数がまだ入っていません。${admin ? '下の「編集」から数を入れてください。' : '管理の人に数を入れてもらってください。'}</div>` : ''}
+    ${noCount(it) ? `<div class="infobox">数がまだ入っていません。下の「編集・数の変更」から数を入れてください。</div>` : ''}
     ${it.memo ? `<div class="note" style="margin:0 0 10px">📝 ${esc(it.memo)}</div>` : ''}
     ${isUse(it) ? `
     <div class="big"><div class="main"><small>倉庫にある</small><b>${it.inStock || 0}</b>${esc(it.unit)}</div></div>
@@ -647,7 +694,7 @@ async function openItem(id) {
       <button class="btn out" data-act="moveOut" ${(it.inStock || 0) > 0 ? '' : 'disabled'}>持ち出す</button>
       <button class="btn" data-act="moveIn" ${outs.length ? '' : 'disabled'}>返す</button>
     </div>`}
-    ${admin ? `<div class="btns"><button class="btn sub" data-act="edit">✏️ 編集・数の変更</button></div>` : ''}
+    <div class="btns"><button class="btn sub" data-act="edit">✏️ 編集・数の変更</button></div>
     <h2>最近の記録</h2>
     ${hist.length ? hist.map(logHtml).join('') : '<div class="note">まだ記録はありません</div>'}
   `);
@@ -831,7 +878,7 @@ async function saveEdit() {
     let tv = null;
     if (pendingPhoto) { await DB.setPhoto(id, pendingPhoto.full); tv = await saveThumb(id, pendingPhoto.thumb); }
     if (isNew) {
-      const ni = { name, cat, unit, total, min, memo, inStock: total, out: {}, updated: Date.now() };
+      const ni = { name, cat, unit, total, min, memo, inStock: total, out: {}, order: nextOrder(cat), updated: Date.now() };
       if (tv) ni.thumbVer = tv;
       await DB.setItem(id, ni);
       await DB.log({ t: 'new', itemId: id, name, unit, qty: total, person: who, at: Date.now() });
@@ -1003,9 +1050,12 @@ document.addEventListener('click', e => {
     else if (a === 'saveEdit') saveEdit();
     else if (a === 'delete') askDelete();
     else if (a === 'delOk') delItem();
-    else if (a === 'pinOk') checkPin();
     else if (a === 'importInit') importInitial();
-    else if (a === 'selStart') { selMode = true; sel.clear(); render(); }
+    else if (a === 'sortStart') { sortMode = true; selMode = false; sel.clear(); render(); }
+    else if (a === 'sortEnd') { sortMode = false; render(); }
+    else if (a === 'mvUp') moveItem(t.dataset.id, -1);
+    else if (a === 'mvDn') moveItem(t.dataset.id, 1);
+    else if (a === 'selStart') { selMode = true; sortMode = false; sel.clear(); render(); }
     else if (a === 'selEnd') { selMode = false; sel.clear(); render(); }
     else if (a === 'selAll') { const all = visibleIds.every(id => sel.has(id)); visibleIds.forEach(id => all ? sel.delete(id) : sel.add(id)); render(); }
     else if (a === 'bulkMove') openBulkMove();
@@ -1033,6 +1083,7 @@ document.addEventListener('click', e => {
   if (t.dataset.c) { filter = t.dataset.c; renderList(); return; }
   if (t.dataset.id) {
     if (selMode && t.classList.contains('card')) return toggleSel(t.dataset.id);
+    if (sortMode && t.classList.contains('card')) return;
     openItem(t.dataset.id);
   }
 });
@@ -1054,23 +1105,15 @@ $('#q').addEventListener('input', e => { query = e.target.value.trim(); renderLi
 $('#lowAlert').onclick = () => { filter = 'low'; renderList(); };
 $('#sheetBg').onclick = closeSheet;
 $('#fab').onclick = () => openEdit(null);
+// 管理モード：暗証番号なしで、押すだけで切りかえ
 $('#adminBtn').onclick = () => {
-  if (admin) { admin = false; render(); toast('管理モードを終わりました'); if (openId) openItem(openId); return; }
-  openId = null; editId = null;
-  openSheet(`
-    <div class="sheet-head"><h2>管理モード</h2><button class="close" data-act="close">✕</button></div>
-    <label class="f" for="fPin">暗証番号を入れてください</label>
-    <input class="in pin" id="fPin" type="password" inputmode="numeric" autocomplete="off">
-    <div class="btns" style="margin-top:20px"><button class="btn" data-act="pinOk">入る</button></div>
-  `);
-  setTimeout(() => { const i = $('#fPin'); if (i) i.focus(); }, 250);
+  admin = !admin;
+  if (!admin) { selMode = false; sortMode = false; sel.clear(); }
+  render();
+  toast(admin ? '管理モードになりました' : '管理モードを終わりました');
+  if (openId) openItem(openId);
 };
-function checkPin() {
-  if ($('#fPin').value === ADMIN_PIN) { admin = true; closeSheet(); render(); toast('管理モードになりました'); }
-  else { toast('番号がちがいます'); $('#fPin').value = ''; }
-}
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.id === 'fPin') checkPin();
   if (e.key === 'Enter' && e.target.id === 'fNewCat' && !e.isComposing) addCat();
 });
 
